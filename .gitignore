@@ -1,0 +1,9 @@
+docs/html/*
+docs/_build/*
+docs/scripts/__pycache__/*
+docs/scripts/*.py
+clones/__pycache__/*
+clones/__pycache__/
+__pycache__/*
+.idea
+*.egg-info
