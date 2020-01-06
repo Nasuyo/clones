@@ -239,7 +239,8 @@ class Clock():
         # dict for the different signal descriptions and units
         signal = {'N': ('Geoid height', 'm'),
                   'h': ('Elevation', 'm'),
-                  'g': ('Gravity acceleration', 'm/s^2')}
+                  'g': ('Gravity acceleration', 'm/s^2'),
+                  'ff': ('Fractional Frequency', '-')}
         
         # write the different sources to netcdf
         for effect_name in effect_names:
@@ -279,14 +280,19 @@ class Clock():
                 dct['t'] = ds['time'].data
             except:
                 print('Warning: Time not included in ' + effect_name)
-            try:
-                dct['h'] = ds['h'].data
-            except:
-                print('Warning: Elevation not included in ' + effect_name)
-            try:
-                dct['N'] = ds['N'].data
-            except:
-                print('Warning: Geoid height not included in ' + effect_name)
+            for var in ds.data_vars:
+                try:
+                    dct[var] = ds[var].data
+                except:
+                    print('Warning: ' + var + ' not included in ' + effect_name)
+            # try:
+            #     dct['h'] = ds['h'].data
+            # except:
+            #     print('Warning: Elevation not included in ' + effect_name)
+            # try:
+            #     dct['N'] = ds['N'].data
+            # except:
+            #     print('Warning: Geoid height not included in ' + effect_name)
             setattr(self, effect_name, dct)  # equal to: self.effect_name = dct, but effect_name can be a string
 
     def add_noise(self):
@@ -362,6 +368,14 @@ class Network():
             self.clocks = []
             self.links = []
             os.makedirs(cfg.PATHS['WORKING_DIR'] + 'clocks')
+                    
+    def __repr__(self):
+        """To be printed if instance is written."""
+        
+        summary = '<Network of optical clocks>\n'
+        for c in self.clocks:
+            summary += c.location + '\n'
+        return summary + '\n'
             
     def from_file(self):
         """Initializes an already built optical clock network."""
@@ -413,14 +427,6 @@ class Network():
                 if clo.lon > value[0] and clo.lon < value[1]:
                     clos.append(clo)
         return clos
-                    
-    def __repr__(self):
-        """To be printed if instance is written."""
-        
-        summary = '<Network of optical clocks>\n'
-        for c in self.clocks:
-            summary += c.location + '\n'
-        return summary + '\n'
 
     def add_clock(self, clo):
         """Adds a clock to the network.
@@ -493,6 +499,22 @@ class Network():
         
         for clo in self.clocks:
             clo.sh2timeseries(F_lm, t, kind, unit, unitTo=unitTo)
+            
+    def h2ff(self, effect_names):
+        """Convert elevation change to ff change for all clocks."""
+        
+        for effect_name in effect_names:
+            for clo in self.clocks:
+                effect = getattr(clo, effect_name)
+                effect['ff'] = clo.h2ff(effect['h'])
+            
+    def N2ff(self, effect_names):
+        """Convert elevation change to ff change for all clocks."""
+        
+        for effect_name in effect_names:
+            for clo in self.clocks:
+                effect = getattr(clo, effect_name)
+                effect['ff'] = clo.h2ff(effect['N'])
             
     def to_file(self):
         """Writes the clock info of all network clocks into netcdf and json
@@ -586,7 +608,7 @@ class Network():
                 t = effect['t']
                 ax.plot(t, data, label=clo.location)
             except:
-                print('Clock in ' + clo.location + 'does not have information' +
+                print('Clock in ' + clo.location + ' does not have information' +
                       ' from ' + kind + ' about ' + unit)
         ax.set_xlabel('time [y]')
         unit_dict = {'U': 'Gravity potential [m$^2$/s$^2$]',
