@@ -9,6 +9,7 @@ Created on Fri Nov  8 10:28:55 2019
 # Imports ---------------------------------------------------------------------
 from clones import harmony, cfg
 from time import gmtime, strftime
+import datetime
 import numpy as np
 import astropy
 import geopy
@@ -21,6 +22,10 @@ import contextily as ctx
 import pandas as pd
 import geopandas as gpd
 import matplotlib.pyplot as plt
+import salem
+import cartopy.crs as ccrs
+import cartopy.feature as cfeature
+import pygmt
 from shapely.geometry import Point, LineString, Polygon
 
 # Classes and functions -------------------------------------------------------
@@ -500,21 +505,13 @@ class Network():
         for clo in self.clocks:
             clo.sh2timeseries(F_lm, t, kind, unit, unitTo=unitTo)
             
-    def h2ff(self, effect_names):
-        """Convert elevation change to ff change for all clocks."""
+    def h_N_2ff(self, effect_names):
+        """Convert elevation and geoid change to ff change for all clocks."""
         
         for effect_name in effect_names:
             for clo in self.clocks:
                 effect = getattr(clo, effect_name)
-                effect['ff'] = clo.h2ff(effect['h'])
-            
-    def N2ff(self, effect_names):
-        """Convert elevation change to ff change for all clocks."""
-        
-        for effect_name in effect_names:
-            for clo in self.clocks:
-                effect = getattr(clo, effect_name)
-                effect['ff'] = clo.h2ff(effect['N'])
+                effect['ff'] = clo.h2ff(effect['h']) + clo.N2ff(effect['N'])
             
     def to_file(self):
         """Writes the clock info of all network clocks into netcdf and json
@@ -524,8 +521,12 @@ class Network():
             clo.to_file()
 
     def plot(self, background='TerrainBackground'):
-        """Plots the network on top of a basemap."""
+        """Plots the network on top of a basemap.
         
+        Deprecated!"""
+        
+        print('WARNING: This plot-function is deprecated. Use plotNetwork()'
+              + ' instead!')
        
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         # Clocks = Points
@@ -570,6 +571,149 @@ class Network():
         
         return gdf, gdf_links
     
+    def plotNetwork(self, zoom='close'):
+        """."""
+             
+        if zoom == 'close':
+            region = [0, 26, 44, 62]
+            projection = 'S13/90/6i'
+        elif zoom == 'far':
+            region = [-20, 40, 30, 70]
+            projection = 'S10/90/6i'
+        else:
+            region = [-10, 30, 40, 65]
+            projection = 'S10/90/6i'
+        relief = pygmt.datasets.load_earth_relief('02m')
+        
+        fig = pygmt.Figure()
+        pygmt.makecpt(cmap='wiki-2.0', series=[-3175*0.45, 6000*0.45])
+        fig.grdimage(relief, region=region,
+                      projection=projection, frame="ag")
+        fig.coast(region=region, projection=projection, frame="a",
+                  shorelines="0.3p,black", borders="1/0.5p,black")
+        fig.plot(self.lons(), self.lats(), style="c0.09i", color="white",
+                  pen="black")
+        # fig.plot(CLONETS.lons(), CLONETS.lats(), style="c0.09i", color="red",
+        #           pen="black")
+        for clo in self.clocks:
+        # for clo in CLONETS.clocks:
+            if clo.location == 'Potsdam':
+                fig.text(x=clo.lon-0.3, y=clo.lat+0.6, text=clo.location, region=region,
+                         projection=projection, font='12p,Helvetica,black',
+                         justify='LT')
+            elif clo.location == 'Helsinki':
+                fig.text(x=clo.lon-3.3, y=clo.lat+1, text=clo.location, region=region,
+                         projection=projection, font='12p,Helvetica,black',
+                         justify='LT')
+            else:
+                # fig.plot(clo.lon, clo.lat, style='l1+t"blah"', color='white')
+                fig.text(x=clo.lon+0.3, y=clo.lat, text=clo.location, region=region,
+                         projection=projection, font='12p,Helvetica,black',
+                         justify='LT')
+        # for l in self.links:
+        # # for l in CLONETS.links:
+        #     fig.plot(style='ql'+str(l.a.lon)+'/'+str(l.a.lat)+'/'+str(l.b.lon)+'/'+str(l.b.lat)+'+lblah')
+            
+                
+        return fig
+    
+    def plotSignal(self, kind, t, unitFrom, unitTo, t_ref=None, save=False):
+        """Plots the signal on a map.
+        
+        :param kind:
+        :type kind: str
+        :param t: point in time
+        :type t: datetime.datetime or str
+        :param unitFrom: unit in which the data is stored
+        :type unitFrom: str
+        :param unitTo: unit that is to be plotted
+        :type unitTo: str
+        :param t_ref: optional reference point in time
+        :type t_ref: datetime.datetime or str (must match t)
+        
+        Possible units:
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+            'h' .... elevation [m]
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+            'gravity'... [m/s^2]
+            'ff' ... fractional frequency [-]
+            
+        Possible kinds:
+            'I' ... Ice
+            'H' ... Hydrology
+            'A' ... Atmosphere
+            'O' ... Ocean
+            'GIA'.. Glacial Isostatic Adjustment
+            'S' ... Solid Earth
+        """
+        
+        cb_dict = {'U': '"Gravity potential [m@+2@+/s@+2@+]"',
+                     'N': '"Geoid height [m]"',
+                     'h': '"Elevation [m]"',
+                     'sd': '"Surface Density [kg/m@+2@+]"',
+                     'ewh': '"Equivalent water height [m]"',
+                     'gravity': '"Gravity acceleration [m/s@+2@+]"',
+                     'ff': '"Fractional frequency [-]"'}
+        signal_dict = {'I': 'oggm_',
+                       'I_scandinavia': 'oggm_',
+                       'H': 'clm_tws_',
+                       'A': 'coeffs_'}
+        unit_dict = {'U': 'Gravity potential [m$^2$/s$^2$]',
+                   'N': 'Geoid height [m]',
+                   'h': 'Elevation [m]',
+                   'sd': 'Surface Density [kg/m$^2$]',
+                   'ewh': 'Equivalent water height [m]',
+                   'gravity': 'Gravity acceleration [m/s$^2$]',
+                   'ff': 'Fractional frequency [-]'}
+        path = cfg.PATHS['data_path']
+        savepath = path + '../fig/'
+        
+        if type(t) is not str:
+            t = datetime.datetime.strftime(t, format='%Y_%m_%d')
+            if t_ref:
+                t_ref = datetime.datetime.strftime(t_ref, format='%Y_%m_%d')
+        f_lm = harmony.shcoeffs_from_netcdf(
+            os.path.join(path, kind, signal_dict[kind] + t + '.nc'))
+        if t_ref:
+            f_lm_ref = harmony.shcoeffs_from_netcdf(
+                os.path.join(path, kind, signal_dict[kind] + t_ref + '.nc'))
+            f_lm = f_lm - f_lm_ref
+        f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+        
+        grid = f_lm.pad(720).expand()
+        data = grid.to_array()
+        x = grid.lons()
+        y = grid.lats()
+        # find out what the datalimits are within the shown region
+        data_lim = np.concatenate((grid.to_array()[200:402, -81:],
+                                grid.to_array()[200:402, :242]), axis=1)
+        datamax = np.max(abs(data_lim))
+        
+        da = xr.DataArray(data, coords=[y, x], dims=['lat', 'lon'])
+        # save the dataarray as netcdf to work around the 360° plotting problem
+        da.to_dataset(name='dataarray').to_netcdf(path + 'temp/pygmt.nc')
+        fig = pygmt.Figure()
+        pygmt.makecpt(cmap='polar', series=[-datamax, datamax], reverse=True)
+        fig.grdimage(path + 'temp/pygmt.nc', region=[-10, 30, 40, 65],
+                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
+        fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
+                  shorelines="0.1p,black", borders="1/0.1p,black")
+        fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
+                 pen="black")
+        # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
+        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        
+        if save:
+            if t_ref:
+                fig.savefig(os.path.join(savepath, kind, signal_dict[kind] + t
+                                         + '-' + t_ref + '_' + unitTo + '.pdf'))    
+            else:
+                fig.savefig(os.path.join(savepath, kind, signal_dict[kind] + t
+                                         + '.pdf'))
+        return fig
+
     def plotTimeseries(self, kind, unit):
         """Plots the timeseries of all clocks.
         
