@@ -63,7 +63,7 @@ def sh2sh(f_lm, From, To):
     lln_k1 = lln[0:lmax+1,3] + 1
     lln_h = lln[0:lmax+1,1]
     
-    if From in('pot', 'U', 'N', 'ff'): 
+    if From in('pot', 'U', 'N'): 
         # First: Back to GRACE format: 'pot'
         if From == 'U':
             f_lm = f_lm * R / GM
@@ -72,14 +72,12 @@ def sh2sh(f_lm, From, To):
         elif From == 'ff':
             f_lm = f_lm * c**2 * R / GM
              
-        if To in('pot', 'U', 'N', 'ff'):
+        if To in('pot', 'U', 'N'):
         # Then: Into the desired format (unless it's 'pot')
             if To == 'U':
                 f_lm = f_lm * GM / R
             elif To == 'N':
                  f_lm = f_lm * R
-            elif To == 'ff':
-                f_lm = f_lm * GM / R / c**2
             # Done
             return f_lm
         elif To in('mass', 'sd', 'ewh'):
@@ -102,15 +100,29 @@ def sh2sh(f_lm, From, To):
             f_lm = sh.SHCoeffs.to_array(f_lm) * pot2def.reshape(lmax+1,1) * R
             # Done
             return sh.SHCoeffs.from_array(f_lm)
+        elif To == 'ff':
+            # Part that is changed by a potential change
+            f_lm_pot = f_lm * GM / R / c**2
+            # Part that is changed by a height change
+            lln_k1[1] = 0.02601378180 + 1  # from CM to CF
+            lln_h[1] = -0.2598639762  # from CM to CF
+            pot2def = lln_h / lln_k1
+            f_lm_h = sh.SHCoeffs.to_array(f_lm) * pot2def.reshape(lmax+1,1) * R
+            f_lm_h = f_lm_h * GM / R**2 / c**2
+            f_lm = sh.SHCoeffs.from_array(-f_lm_h) + f_lm_pot
+            # Done
+            return f_lm
         elif To == 'gravity':
-            # The load love numbers solely come from the fact that the gravity
-            # changes with altitude. The pure (free-air) gravity change would
-            # only incorporate f_lm = -f_lm * GM / R^2 * (n+1)
-            pot2grav = (((np.arange(lmax+1)+1) * lln_k1 - 2 * lln_h) /
-                        (2*np.arange(lmax+1)+1))
-            f_lm = f_lm.to_array() * pot2grav.reshape(lmax+1,1)
-            f_lm = -f_lm * GM / R**2 * 3 / rho_e  # [m/s^2]
-            return sh.SHCoeffs.from_array(f_lm)
+            pot2grav = np.arange(lmax+1)+1
+            f_lm_pot = f_lm.to_array() * pot2grav.reshape(lmax+1, 1)
+            f_lm_pot = -f_lm_pot * GM / R**2
+            lln_k1[1] = 0.02601378180 + 1  # from CM to CF
+            lln_h[1] = -0.2598639762  # from CM to CF
+            pot2def = lln_h / lln_k1
+            f_lm_h = (sh.SHCoeffs.to_array(f_lm) * pot2def.reshape(lmax+1,1)
+                      * R * (-2))
+            f_lm_h = f_lm_h * GM / R**3
+            return sh.SHCoeffs.from_array(-f_lm_h + f_lm_pot)
         else:
             print('Choose a proper output unit!')
         
@@ -129,7 +141,7 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * R * rho_e / 3 / rho_w
             # Done
             return f_lm
-        elif To in('pot', 'U', 'N', 'ff'):
+        elif To in('pot', 'U', 'N'):
         # Then: Load love transformation
             mass2pot = lln_k1 / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
             f_lm = f_lm.to_array() * mass2pot.reshape(lmax+1,1)
@@ -138,8 +150,6 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
-            elif To == 'ff':
-                f_lm = f_lm * GM / R / c**2
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -149,16 +159,40 @@ def sh2sh(f_lm, From, To):
             f_lm = sh.SHCoeffs.to_array(f_lm) * mass2def.reshape(lmax+1,1) * R
             # Done
             return sh.SHCoeffs.from_array(f_lm)
+        elif To == 'ff':
+            # Part that is changed by a potential change
+            mass2pot = lln_k1 / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
+            f_lm_pot = sh.SHCoeffs.to_array(f_lm) * mass2pot.reshape(lmax+1,1)
+            f_lm_pot = f_lm_pot * GM / R / c**2
+            # Part that is changed by a height change
+            mass2def = lln_h / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
+            f_lm_h = (sh.SHCoeffs.to_array(f_lm) * mass2def.reshape(lmax+1,1)
+                      * R)
+            f_lm_h = f_lm_h * GM / R**2 / c**2
+            # Done
+            return sh.SHCoeffs.from_array(-f_lm_h + f_lm_pot)
         elif To == 'gravity':
-            pot2grav = (((np.arange(lmax+1)+1) * lln_k1 - 2 * lln_h) * lln_k1 /
-                        (2*np.arange(lmax+1)+1)**2)
-            f_lm = f_lm.to_array() * pot2grav.reshape(lmax+1,1)
-            f_lm = -f_lm * GM / R**2 * 3 / rho_e  # [m/s^2]
-            return sh.SHCoeffs.from_array(f_lm)
+            # Part that is changed by a potential change
+            mass2pot = lln_k1 / (2*np.arange(lmax+1)+1)  # downweight high degrees
+            f_lm_pot = sh.SHCoeffs.to_array(f_lm) * mass2pot.reshape(lmax+1, 1)
+            pot2grav = np.arange(lmax+1)+1  # before this it was like for ff
+            f_lm_pot = f_lm_pot * pot2grav.reshape(lmax+1, 1)
+            f_lm_pot = -f_lm_pot * GM / R**2
+            # Part that is changed by a height change
+            mass2def = lln_h / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
+            f_lm_h = (sh.SHCoeffs.to_array(f_lm) * mass2def.reshape(lmax+1,1)
+                      * R * (-2))
+            f_lm_h = -f_lm_h * GM / R**3
+            # Done
+            return sh.SHCoeffs.from_array(-f_lm_h + f_lm_pot)
         else:
             print('Choose a proper output unit!')
        
     elif From == 'h':
+        print('NOT YET IMPLEMENTED!')  # TODO
+        return f_lm
+    
+    elif From == 'ff':
         print('NOT YET IMPLEMENTED!')  # TODO
         return f_lm
     
