@@ -15,7 +15,10 @@ import xarray as xr
 import json
 import time
 import scipy
+from scipy.fftpack import rfft
+from scipy.fftpack import fft
 from clones import cfg
+from clones.DDKfilter import DDKfilter
 
 # -----------------------------------------------------------------------------
 def sh2sh(f_lm, From, To):
@@ -36,7 +39,8 @@ def sh2sh(f_lm, From, To):
         'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
             'U' ... geopotential [m^2/s^2]
             'N' ... geoid height [m]
-            'ff' ... fractional frequency [-]
+            'GRACE' ... geoid height [m], but with lmax=120 and filtered
+        'ff' ... fractional frequency [-]
         'h' .... elevation [m]
         'mass' ... dimensionless surface loading coeffs
             'sd' ... surface density [kg/m^2]
@@ -45,7 +49,7 @@ def sh2sh(f_lm, From, To):
     """
     
     if From == To:
-        print('Well, that was a hard one!')
+        # print('Well, that was a hard one!')
         return f_lm
     
     # Constants
@@ -72,12 +76,14 @@ def sh2sh(f_lm, From, To):
         elif From == 'ff':
             f_lm = f_lm * c**2 * R / GM
              
-        if To in('pot', 'U', 'N'):
+        if To in('pot', 'U', 'N', 'GRACE'):
         # Then: Into the desired format (unless it's 'pot')
             if To == 'U':
                 f_lm = f_lm * GM / R
             elif To == 'N':
-                 f_lm = f_lm * R
+                f_lm = f_lm * R
+            elif To == 'GRACE':
+                f_lm = ddk(f_lm.pad(120), 3) * R
             # Done
             return f_lm
         elif To in('mass', 'sd', 'ewh'):
@@ -141,7 +147,7 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * R * rho_e / 3 / rho_w
             # Done
             return f_lm
-        elif To in('pot', 'U', 'N'):
+        elif To in('pot', 'U', 'N', 'GRACE'):
         # Then: Load love transformation
             mass2pot = lln_k1 / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
             f_lm = f_lm.to_array() * mass2pot.reshape(lmax+1,1)
@@ -150,6 +156,9 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
+            elif To == 'GRACE':
+                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120), 3) * R
+                return f_lm
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -198,6 +207,10 @@ def sh2sh(f_lm, From, To):
     
     elif From == 'gravity':
         print('NOT YET IMPLEMENTED!')  # TODO
+        return f_lm
+    
+    elif From == 'GRACE':
+        print('Not possible with a DDK filter')  # TODO
         return f_lm
     
     else:
@@ -260,3 +273,124 @@ def shcoeffs_from_netcdf(filename):
     coeffs = sh.SHCoeffs.from_array(cs)
     
     return coeffs
+
+def disc_autocovariance(x):
+    """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'."""
+    n = len(x)
+    m = int(n/10)
+    C = np.zeros(m+1)
+    x = x - np.mean(x)
+    for k in range(m+1):
+        C[k] = x[:n-k].dot(x[k:n]) / (n-k-1)
+    
+    return C
+
+def amplitude_spectrum(C, dt):
+    """Amplitude spectrum = Scaled fourier transform of the discrete
+    autocovariance function (power spectrum) after (9.52).
+    """
+    
+    def hamming(j, m):
+        return 0.54 + 0.46 * np.cos(j/m*np.pi)
+    m = len(C) - 1
+    P = np.zeros(m+1)
+    j = np.arange(1, m)
+    for k in range(m):
+        P[k] = 4 * dt * (0.5 * (C[0]+(-1)**k*hamming(m, m)*C[m])
+                         + hamming(j, m).dot(C[j]*np.cos(np.pi*k*j/m)))
+    A = np.sqrt(np.abs(P) / m / dt)
+    dv = 1 / 2 / m / dt  # delta ny
+    vn = 1 / 2 / dt  # nyquist
+    v = np.arange(0, vn, dv)
+    
+    return v, A
+
+def time2freq(delta_t, signal):
+    """Uses scipy's fftpack.fft to Fourier-transform the timeseries.
+    
+    :param delta_t: measurement sampling rate [s]
+    :type delta_t: float
+    :param signal: the signal
+    :type signal: numpy.array of floats
+    :rparam f: frequency vector [Hz]
+    :rtype f: numpy.array of floats
+    :rparam freq: absolute values of the amplitudes
+    :rtype freq: numpy.array of floats
+    """
+    
+    count = len(signal)
+    Fs_nyquist = 1 / (2*delta_t)  # [Hz]
+    anz_freq = int(np.floor(count/2)) + 1  # number of frequencies [Hz]
+    f = Fs_nyquist * np.linspace(0, 1, anz_freq)  # frequency vector [Hz]
+    freq = np.abs(fft(signal))[:anz_freq] / count * 2  # unit of the signal
+    
+    return f, freq
+
+def sh_nm2i(n, m, nmax):
+    """Returns an index for degree/order of sh coefficients.
+    
+    I = [0
+         1, 4
+         2, 5, 7
+         3, 6, 8, 9]]
+    """
+    
+    if m > n:
+        raise ValueError('Order should not be larger than degree!')
+    return round(m*(nmax+1) - (m*(m+1))/2 + n)
+
+def sh_mat2vec(NM):
+    """Converts a triangular matrix into a vector with the lower half.
+    
+    See sh_nm2i for the indices.
+    """
+    N = len(NM)-1
+    v = np.zeros(sh_nm2i(N, N, N)+1)
+    for n in range(N+1):
+        for m in range(n+1):
+            v[sh_nm2i(n, m, N)] = NM[n][m]
+    return v
+
+def sh_vec2mat(v, N):
+    """Converts a vector to a triangular matrix.
+    
+    See sh_nm2i for the indices.
+    """
+    
+    NM = np.zeros((N+1, N+1))
+    for n in range(N+1):
+        for m in range(n+1):
+            NM[n][m] = v[sh_nm2i(n, m, N)]
+    return NM
+
+def ddk(coeffs, x):
+    """Function for an easier call of the right filter."""
+    
+    if x == 1:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d14p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 2:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d13p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 3:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d12p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 4:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_5d11p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 5:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d11p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 6:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_5d10p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 7:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d10p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    elif x == 8:
+        DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_5d9p_4');
+        coeffs_filtered = DDK(coeffs)  # coeffs
+    else:
+        print('Number 1 to 8 please!')
+        return coeffs
+    return coeffs_filtered

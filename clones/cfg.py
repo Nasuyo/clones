@@ -19,8 +19,8 @@ def configure():
 
     global PATHS
     PATHS = {}
-    PATHS['lln_path'] = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-         '..', 'data')
+    PATHS['lln_path'] = os.path.join(os.path.dirname(
+        os.path.abspath(__file__)), '..', 'data')
         
     config = configparser.ConfigParser()
     config.read(os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -28,3 +28,4 @@ def configure():
         
     PATHS['WORKING_DIR'] = config['paths']['WORKING_DIR']
     PATHS['data_path'] = config['paths']['data_path']
+    PATHS['fig_path'] = config['paths']['fig_path']
