@@ -157,7 +157,7 @@ def sh2sh(f_lm, From, To):
             elif To == 'N':
                 f_lm = f_lm * R
             elif To == 'GRACE':
-                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120), 3) * R
+                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120), 4) * R
                 return f_lm
             # Done
             return sh.SHCoeffs.from_array(f_lm)
