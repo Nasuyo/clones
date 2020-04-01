@@ -76,17 +76,15 @@ def sh2sh(f_lm, From, To):
         elif From == 'ff':
             f_lm = f_lm * c**2 * R / GM
              
-        if To in('pot', 'U', 'N', 'GRACE'):
+        if To in('pot', 'U', 'N'):
         # Then: Into the desired format (unless it's 'pot')
             if To == 'U':
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
-            elif To == 'GRACE':
-                f_lm = ddk(f_lm.pad(120), 3) * R
             # Done
             return f_lm
-        elif To in('mass', 'sd', 'ewh'):
+        elif To in('mass', 'sd', 'ewh', 'ewhGRACE'):
             # Then: Load love transformation
             lln_k1[1] = 0.02601378180 + 1  # from CM to CF
             pot2mass = (2*np.arange(0,lmax+1)+1) / lln_k1  # upweight high degrees
@@ -96,6 +94,8 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * R * rho_e / 3
             elif To == 'ewh':
                 f_lm = f_lm * R * rho_e / 3 / rho_w
+            elif To == 'ewhGRACE':
+                f_lm = ddk(f_lm.pad(120) * R * rho_e / 3 / rho_w, 3)
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -139,15 +139,17 @@ def sh2sh(f_lm, From, To):
         elif From == 'ewh':
             f_lm = f_lm / R / rho_e * 3 * rho_w
             
-        if To in('mass', 'sd', 'ewh'):
+        if To in('mass', 'sd', 'ewh', 'ewhGRACE'):
         # Then: Into the desired format (unless it's 'mass')
             if To == 'sd':
                 f_lm = f_lm * R * rho_e / 3
             elif To == 'ewh':
                 f_lm = f_lm * R * rho_e / 3 / rho_w
+            elif To == 'ewhGRACE':
+                f_lm = ddk(f_lm.pad(120) * R * rho_e / 3 / rho_w, 3)
             # Done
             return f_lm
-        elif To in('pot', 'U', 'N', 'GRACE'):
+        elif To in('pot', 'U', 'N'):
         # Then: Load love transformation
             mass2pot = lln_k1 / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
             f_lm = f_lm.to_array() * mass2pot.reshape(lmax+1,1)
@@ -156,9 +158,6 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
-            elif To == 'GRACE':
-                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120), 4) * R
-                return f_lm
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -273,6 +272,52 @@ def shcoeffs_from_netcdf(filename):
     coeffs = sh.SHCoeffs.from_array(cs)
     
     return coeffs
+
+def read_SHCoeffs_errors(path, headerlines, k=True):
+    """Reads an ascii file with spherical harmonics.
+    
+    The columns have to be (key,) L, M, C, S, sigmaC, sigmaS. Returns a
+    dictionary with pyshtools.SHCoeffs objects for the coefficients and their
+    sigmas.
+    
+    :type path: str
+    :param path: path to the ascii file
+    :type headerlines: int
+    :param headerlines: number of header lines
+    :type k: bool
+    :param k: Is the first column a key?
+    :rtype: dict with pyshtools.SHCoeffs
+    :rparam: coeffs, sigma are the keys. The SHCoeffs are the variables
+    """
+    
+    with open(path) as f:
+        for i in range(headerlines):
+            print(f.readline(), end='')
+        rows = []
+        for line in f:
+            row = line.split()
+            if k:
+                row = [float(i) for i in row[1:]]
+            else:
+                row = [float(i) for i in row]
+            row[0:2] = [int(i) for i in row[0:2]]
+            rows.append(row)
+    N = int(np.sqrt(len(rows)*2)) - 1
+    c = np.zeros((N+1, N+1))
+    s = np.zeros((N+1, N+1))
+    sigmaC = np.zeros((N+1, N+1))
+    sigmaS = np.zeros((N+1, N+1))
+    for row in rows[:-1]:
+        c[row[0], row[1]] = row[2]
+        s[row[0], row[1]] = row[3]
+        sigmaC[row[0], row[1]] = row[4]
+        sigmaS[row[0], row[1]] = row[5]   
+#        print(row[0], row[1])
+    coeffs = sh.SHCoeffs.from_array(np.transpose(np.dstack((c, s)),
+                                                 (2, 0, 1)))
+    sigma = sh.SHCoeffs.from_array(np.transpose(np.dstack((sigmaC, sigmaS)),
+                                                 (2, 0, 1)))
+    return {'coeffs': coeffs, 'sigma': sigma}
 
 def disc_autocovariance(x):
     """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'."""

@@ -322,7 +322,7 @@ class Clock():
             return T_date, series, noise
         
         return T_date, series
-    
+     
     def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
                        reset=False, error=False, sigma=False, save=False):
         """Plots time series at clock location.
@@ -665,7 +665,7 @@ class Clock():
         
         path = cfg.PATHS['data_path'] + esc + '/'
         f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
-        grid = f_lm.expand()
+        grid = f_lm.pad(720).expand()
         y = np.arange(int(grid.nlat/10), int(grid.nlat/3))
         x_east = np.arange(int(grid.nlon/6))
         x_west = np.arange(int(grid.nlon/20*19), grid.nlon)
@@ -736,21 +736,21 @@ class Clock():
         da.to_dataset(name='dataarray').to_netcdf(path + '../temp/pygmt.nc')
         
         fig = pygmt.Figure() 
-        pygmt.makecpt(cmap='drywet', series=[datamin, datamax])
-        fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
-                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
-        fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
-                  shorelines="1/0.1p,white", borders="1/0.1p,white")
-        fig.plot(self.lon, self.lat, style="c0.07i", color="white",
-                 pen="black")
-        fig.colorbar(frame='paf+l' + 'correlation')  # @+x@+ for ^x
+        # pygmt.makecpt(cmap='viridis', series=[datamin, datamax], reverse=True)
+        # fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
+        #               projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
+        # fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
+        #           shorelines="1/0.1p,white", borders="1/0.1p,white")
+        # fig.plot(self.lon, self.lat, style="c0.07i", color="white",
+        #           pen="black")
+        # fig.colorbar(frame='paf+l' + 'correlation')  # @+x@+ for ^x
         
-        if save:
-            savepath = path + '../../fig/'
-            savename = (os.path.join(savepath, esc, self.location + '_'
-                                     + esc_dict[esc] + T[0] + '-' + T[-1] + '_'
-                                     + unitTo + '_corr.pdf'))
-            fig.savefig(savename)
+        # if save:
+        #     savepath = path + '../../fig/'
+        #     savename = (os.path.join(savepath, esc, self.location + '_'
+        #                               + esc_dict[esc] + T[0] + '-' + T[-1] + '_'
+        #                               + unitTo + '_corr.pdf'))
+        #     fig.savefig(savename)
         
         return fig, grid, distances, EUROPA_corr
         
@@ -1463,7 +1463,7 @@ class Network():
         
         return gdf, gdf_links
     
-    def plotNetwork(self, zoom='close'):
+    def plotNetwork(self, zoom='close', save=False):
         """."""
              
         if zoom == 'close':
@@ -1531,12 +1531,14 @@ class Network():
                          projection=projection, font='12p,Helvetica,black',
                          justify='LT')
         fig.legend(position='g2/58', box='+gwhite+p1p')
-        fig.savefig('/home/schroeder/CLONETS/fig/clonets_gmt.pdf')
+        
+        if save:
+            fig.savefig('/home/schroeder/CLONETS/fig/clonets_gmt.pdf')
         
         return fig
     
     def plotESC(self, esc, t, unitFrom, unitTo, t_ref=None, save=False,
-                degreevariances=False):
+                degreevariances=False, relief=False):
         """Plots the earth system component signal on a map.
         
         :param esc: earth system component
@@ -1574,6 +1576,7 @@ class Network():
                      'h': '"Elevation [mm]"',
                      'sd': '"Surface Density [kg/m@+2@+]"',
                      'ewh': '"Equivalent water height [m]"',
+                     'ewhGRACE': '"Equivalent water height [m]"',
                      'gravity': '"gravitational acceleration [m/s@+2@+]"',
                      'ff': '"Fractional frequency [-]"',
                      'GRACE': '"Geoid height [mm]"'}
@@ -1594,7 +1597,7 @@ class Network():
         if t_ref:
             f_lm_ref = harmony.shcoeffs_from_netcdf(
                 os.path.join(path, esc, esc_dict[esc] + t_ref + '.nc'))
-            f_lm = f_lm - f_lm_ref
+            f_lm.coeffs = f_lm.coeffs - f_lm_ref.coeffs
         f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
         
         if degreevariances:
@@ -1607,14 +1610,19 @@ class Network():
         x = grid.lons()
         y = grid.lats()
         # find out what the datalimits are within the shown region
-        data_lim = np.concatenate((grid.to_array()[200:402, -81:],
-                                grid.to_array()[200:402, :242]), axis=1)
+        data_lim = np.concatenate((data[200:402, -81:],
+                                   data[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
         
         da = xr.DataArray(data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
         da.to_dataset(name='dataarray').to_netcdf(path + 'temp/pygmt.nc')
         fig = pygmt.Figure()
+        if relief:
+            relief_grid = pygmt.datasets.load_earth_relief('02m')
+            pygmt.makecpt(cmap='gray', series=[0, 5000], reverse=True)
+            fig.grdimage(relief_grid, region=[-10, 30, 40, 65],
+                         projection="S10/90/6i", frame="ag")
         pygmt.makecpt(cmap='polar', series=[-datamax, datamax], reverse=True)
         fig.grdimage(path + 'temp/pygmt.nc', region=[-10, 30, 40, 65],
                      projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
@@ -1632,7 +1640,7 @@ class Network():
             else:
                 fig.savefig(os.path.join(savepath, esc, esc_dict[esc] + t
                                          + '_' + unitTo + '.pdf'))
-        return fig
+        return fig, data
     
     def plotESCatClocks(self, esc, t, unitFrom, unitTo, t_ref=None,
                         loc_ref=False, save=False):
@@ -1673,6 +1681,7 @@ class Network():
                      'h': '"Elevation [mm]"',
                      'sd': '"Surface Density [kg/m@+2@+]"',
                      'ewh': '"Equivalent water height [m]"',
+                     'ewhGRACE': '"Equivalent water height [m]"',
                      'gravity': '"gravitational acceleration [m/s@+2@+]"',
                      'ff': '"Fractional frequency [-]"',
                      'GRACE': '"Geoid height [mm]"'}
@@ -1732,6 +1741,191 @@ class Network():
         return fig, points
     
     def plotRMS(self, T, esc, unitFrom, unitTo, reset=False, save=False,
+                trend=None, lmin=False, lmax=False):
+        """Plots the Root Mean Square on a map.
+        
+        Expands the spherical harmonics from the data folder for each grid
+        point and each time step. Then computes the root mean square error for
+        each of the grid point time series.
+
+        :param T: list of dates
+        :type T: str or datetime.date(time)
+        :param esc: earth system component
+        :type esc: str
+        :param unitFrom: unit of the input coefficients
+        :type unitFrom: str
+        :param unitTo: unit of the timeseries
+        :type unitTo: str
+        :param reset: shall the timeseries be calculated again
+        :type reset: boolean, optional
+        :param save: shall the figure be saved
+        :type save: boolean
+        :param trend: shall a trend be subtracted
+        :type trend: str or odd int, optional
+        :return fig: the figure object
+        :rtype fig: pygmt.Figure
+        :return grid: the plottet data grid
+        :rtype grid: pyshtools.SHGrid
+        
+        Possible trends:
+            'linear' ... just the linear trend
+            'trend' ... trend is plotted instead of the RMS
+            as number: width of the moving average filter, thus the cutoff
+                       period length; has to be an odd integer
+        
+        Possible units:
+            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+                'U' ... geopotential [m^2/s^2]
+                'N' ... geoid height [m]
+                'GRACE' ... geoid height [m], but with lmax=120 and filtered
+            'h' ... elevation [m]
+            'ff' ... fractional frequency [-]
+            'mass' ... dimensionless surface loading coeffs
+                'sd' ... surface density [kg/m^2]
+                'ewh' ... equivalent water height [m]
+            'gravity'... [m/s^2]
+            
+        Possible earth system components:
+            'I' ... Ice
+            'H' ... Hydrology
+            'A' ... Atmosphere
+            'GIA'.. Glacial Isostatic Adjustment
+        """
+        
+        esc_dict = {'I': 'oggm_',
+                    'H': 'clm_tws_',
+                    'A': 'coeffs_'}
+        cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
+                   'N': '"RMS of Geoid height [mm]"',
+                   'h': '"RMS of Elevation [mm]"',
+                   'sd': '"RMS of Surface Density [kg/m@+2@+]"',
+                   'ewh': '"RMS of Equivalent water height [m]"',
+                   'gravity': '"RMS of gravitational acceleration [m/s@+2@+]"',
+                   'ff': '"RMS of Fractional frequency [-]"',
+                   'GRACE': '"RMS of Geoid height [mm]"'}
+        if trend == 'trend':
+            cb_dict = {'U': '"gravitational potential [m@+2@+/s@+2@+]"',
+                         'N': '"Geoid height [mm]"',
+                         'h': '"Elevation [mm]"',
+                         'sd': '"Surface Density [kg/m@+2@+]"',
+                         'ewh': '"Equivalent water height [m]"',
+                         'gravity': '"gravitational acceleration [m/s@+2@+]"',
+                         'ff': '"Fractional frequency [-]"',
+                         'GRACE': '"Geoid height [mm]"'}
+        
+#        if isinstance(T[0], str):
+#            T = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+#        T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # make strings if time is given in datetime objects
+        if not isinstance(T[0], str):
+            T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        path = cfg.PATHS['data_path'] + esc + '/'
+        f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
+        grid = f_lm.pad(720).expand()
+        y = np.arange(int(grid.nlat/10), int(grid.nlat/3))
+        x_east = np.arange(int(grid.nlon/6))
+        x_west = np.arange(int(grid.nlon/20*19), grid.nlon)
+        europe = np.zeros((len(y), len(x_west)+len(x_east)))
+        EUROPA = []
+        for t in T:
+            f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+            if unitTo == 'GRACE':
+                filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
+                sigma = harmony.shcoeffs_from_netcdf(filename)
+                sigma = harmony.sh2sh(sigma, 'pot', 'N')
+                f_lm_witherr = np.random.normal(f_lm.coeffs, sigma.coeffs)
+                f_lm.coeffs = f_lm_witherr
+            if lmin or lmax:
+                if lmin and not lmax:
+                    f_lm = f_lm.pad(720) - f_lm.pad(lmin).pad(720)
+                elif lmax and not lmin:
+                    f_lm = f_lm.pad(lmax).pad(720)
+                elif lmin and lmax:
+                    f_lm = f_lm.pad(lmax).pad(720) - f_lm.pad(lmin).pad(720)
+            grid = f_lm.pad(720).expand()
+            europe[:, :len(x_west)] = grid.data[y, x_west[0]:]
+            europe[:, len(x_west):] = grid.data[y, :len(x_east)]
+            EUROPA.append(copy.copy(europe))
+            print(t)
+        EUROPA = np.array(EUROPA)  # 365er liste mit ~500x400 arrays
+        
+        EUROPA_rms = np.zeros((np.shape(EUROPA)[1:]))
+        EUROPA_coef = np.zeros((np.shape(EUROPA)[1:]))
+        for i in range(np.shape(EUROPA)[1]):
+            for j in range(np.shape(EUROPA)[2]):
+                if trend == 'trend':
+                    t = np.arange(len(EUROPA[:, i, j]))
+                    model = utils.trend(t, EUROPA[:, i, j])
+                    # model = utils.annual_trend(T_frac, EUROPA[:, i, j])
+                    EUROPA_rms[i, j] = model.coef_[0]# * 12
+                    # EUROPA_rms[i, j] = model[1]
+                elif trend == 'linear':
+                    # t = np.arange(len(EUROPA[:, i, j]))
+                    # model = utils.trend(t, EUROPA[:, i, j])
+                    model, A = utils.annual_trend(T_frac, EUROPA[:, i, j])
+                    # EUROPA_trend = (t * model.coef_[0] + model.intercept_)
+                    EUROPA_trend = A[:, :2].dot(model[:2])
+                    EUROPA_rms[i, j] = (utils.rms(EUROPA[:, i, j],
+                                                  EUROPA_trend))
+                elif trend == 'annual' or trend == 'semiannual':
+                    if trend == 'annual':
+                        model, A = utils.annual_trend(T_frac, EUROPA[:, i, j],
+                                                      semi=False)
+                    else:
+                        model, A = utils.annual_trend(T_frac, EUROPA[:, i, j])
+                    EUROPA_trend = A.dot(model)
+                    EUROPA_rms[i, j] = (utils.rms(EUROPA[:, i, j],
+                                                  EUROPA_trend))
+                elif trend == 'mean':  # only experimental
+                    EUROPA_rms[i, j] = np.mean(EUROPA[:, i, j])
+                elif trend == 'slope':  # only experimental, deprecated
+                    t = np.arange(len(EUROPA[:, i, j]))
+                    model = utils.trend(t, EUROPA[:, i, j])
+                    EUROPA_rms[i, j] = model.coef_[0] * len(EUROPA[:, i, j])
+                elif isinstance(trend, int):
+                    # filtered = utils.butter_highpass(EUROPA[:, i, j], trend)
+                    filtered = (EUROPA[:, i, j]
+                                - utils.ma(EUROPA[:, i, j], trend))
+                    EUROPA_rms[i, j] = utils.rms(filtered)
+                else:
+                    EUROPA_rms[i, j] = utils.rms(EUROPA[:, i, j])
+            print(i)
+        
+        # grid.data = np.zeros((np.shape(grid.data)))
+        data = np.zeros((np.shape(grid.data)))
+        data[y, x_west[0]:] = EUROPA_rms[:, :len(x_west)]
+        data[y, :len(x_east)] = EUROPA_rms[:, len(x_west):]
+        if unitTo in('N', 'h', 'GRACE'):
+            data = data * 1e3
+        grid.data = data
+        
+        fig = self.plot_europe_720(grid, path, trend, esc, unitTo, cb_dict)
+        
+        if save:
+            savepath = path + '../../fig/'
+            savename = (os.path.join(savepath, esc, esc_dict[esc] + T[0] + '-'
+                                     + T[-1] + '_' + unitTo + '_RMS.pdf'))
+            if trend == 'linear':
+                savename = savename[:-4] + '_detrended.pdf'
+            if trend == 'annual':
+                savename = savename[:-4] + '_detrended_annual.pdf'
+            if trend == 'semiannual':
+                savename = savename[:-4] + '_detrended_semiannual.pdf'
+            elif trend == 'trend':
+                savename = savename[:-8] + '_trend.pdf'
+            elif isinstance(trend, (int, float)):
+                savename = savename[:-4] + '_filtered_'+ str(trend) + '.pdf'
+            if lmin:
+                savename = savename[:-4] + 'lmin' + str(lmin) + '.pdf'
+            if lmax:
+                savename = savename[:-4] + 'lmax' + str(lmax) + '.pdf'
+            fig.savefig(savename)
+        
+        return fig, grid
+    
+    def plotRMS2(self, T, esc, unitFrom, unitTo, reset=False, save=False,
                 trend=None):
         """Plots the Root Mean Square on a map.
         
@@ -1811,7 +2005,7 @@ class Network():
         
         path = cfg.PATHS['data_path'] + esc + '/'
         f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
-        grid = f_lm.expand()
+        grid = f_lm.pad(720).expand()
         y = np.arange(int(grid.nlat/10), int(grid.nlat/3))
         x_east = np.arange(int(grid.nlon/6))
         x_west = np.arange(int(grid.nlon/20*19), grid.nlon)
@@ -1883,6 +2077,7 @@ class Network():
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
+        datamin = np.min(abs(data_lim))
         
         da = xr.DataArray(data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -1892,35 +2087,43 @@ class Network():
             pygmt.makecpt(cmap='polar', series=[-datamax, datamax],
                           reverse=True)
         else:
-            pygmt.makecpt(cmap='drywet', series=[0, datamax])
-        fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
-                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
+            pygmt.makecpt(cmap='drywet', series=[datamin, datamax])
+        fig.grdimage(path + '../temp/pygmt.nc', region=[-6, 31, 40, 65],
+                     projection="M10i")  # frame: a for the standard frame, g for the grid lines
         if esc == 'H' or esc == 'I' and unitTo == 'ewh':
-            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
-                      frame="a", shorelines="1/0.1p,black",
-                      borders="1/0.1p,black", water='white')
+            fig.coast(region=[-6, 31, 40, 65], projection="M10i",
+                      shorelines="1/0.1p,black",
+                      borders="1/0.2p,black", water='white')
         else:
-            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
-                      frame="a", shorelines="1/0.1p,black",
-                      borders="1/0.1p,black")
-        fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
+            fig.coast(region=[-6, 31, 40, 65], projection="M10i",
+                      shorelines="1/0.1p,black",
+                      borders="1/0.2p,black")
+        nmis = [0, 5, 6, 7, 9, 10, 12, 11, 13, 15, 17, 18]
+        nmi_links = []
+        for i, i2 in zip(nmis[:-1], nmis[1:]):
+            self.add_link(self.clocks[i], self.clocks[i2], 8)
+        self.add_link(self.clocks[nmis[-1]], self.clocks[nmis[0]], 8)
+        for l in self.links:
+            x = [l.a.lon, l.b.lon]
+            y = [l.a.lat, l.b.lat]
+            if l.state == 8:
+                fig.plot(x, y, pen="3p,red")
+        fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
                  pen="black")
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
-        
         if save:
             savepath = path + '../../fig/'
-            savename = (os.path.join(savepath, esc, esc_dict[esc] + T[0] + '-'
-                                     + T[-1] + '_' + unitTo + '_RMS.pdf'))
-            if trend == 'linear':
-                savename = savename[:-4] + '_detrended.pdf'
-            if trend == 'annual':
-                savename = savename[:-4] + '_detrended_annual.pdf'
-            if trend == 'semiannual':
-                savename = savename[:-4] + '_detrended_semiannual.pdf'
-            elif trend == 'trend':
-                savename = savename[:-8] + '_trend.pdf'
-            elif isinstance(trend, (int, float)):
-                savename = savename[:-4] + '_filtered_'+ str(trend) + '.pdf'
+            savename = savepath + 'openlichkeitswork3.pdf'
+            fig.savefig(savename)
+            
+        for l in self.links:
+            x = [l.a.lon, l.b.lon]
+            y = [l.a.lat, l.b.lat]
+            if l.state == 8:
+                fig.plot(x, y, pen="4p,red")
+        fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
+                 pen="black")
+        if save:
+            savename = savepath + 'openlichkeitswork4.pdf'
             fig.savefig(savename)
         
         return fig, grid
@@ -2187,8 +2390,11 @@ class Network():
                 number -= 1
         # clo = self.search_clock('location', 'Braunschweig')[0]
         # T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                    # t_ref=t_ref)
-        # plt.plot(T, [d*1e3 for d in data], label=clo.location, linewidth=2.5, color='tab:blue')
+        #                             t_ref=t_ref)
+        # data = np.array(data)
+        # if unitTo in('N', 'h', 'GRACE'):
+        #     data = data * 1e3
+        # plt.plot(T, data, label=clo.location, linewidth=2.5, color='tab:blue')
         
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
@@ -2302,4 +2508,36 @@ class Network():
         
         return fig
         
+    def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict):
         
+        x = grid.lons()
+        y = grid.lats()
+        # find out what the datalimits are within the shown region
+        data_lim = np.concatenate((grid.to_array()[200:402, -81:],
+                                grid.to_array()[200:402, :242]), axis=1)
+        datamax = np.max(abs(data_lim))
+        
+        da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
+        # save the dataarray as netcdf to work around the 360° plotting problem
+        da.to_dataset(name='dataarray').to_netcdf(path + '../temp/pygmt.nc')
+        fig = pygmt.Figure()
+        if trend == 'trend':
+            pygmt.makecpt(cmap='polar', series=[-datamax, datamax],
+                          reverse=True)
+        else:
+            pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
+        fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
+                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
+        if esc == 'H' or esc == 'I' and unitTo == 'ewh':
+            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
+                      frame="a", shorelines="1/0.1p,black",
+                      borders="1/0.1p,black", water='white')
+        else:
+            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
+                      frame="a", shorelines="1/0.1p,black",
+                      borders="1/0.1p,black")
+        fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
+                 pen="black")
+        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        
+        return fig
