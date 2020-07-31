@@ -11,6 +11,7 @@ Module that contains some utility functions.
 # Imports ---------------------------------------------------------------------
 import pyshtools as sh
 import numpy as np
+import pandas as pd
 from numpy import sqrt, mean, square
 import xarray as xr
 import json
@@ -161,3 +162,28 @@ def frac2datetime(fyear):
     return (dt(year=year, month=1, day=1, hour=0, minute=0,
               second=0, microsecond=microseconds) +
             timedelta(0, int(secondsElapsed)))  # in datetime.datetime
+
+def load_ngl(filename):
+    """Loads in the names and locations of NGL stations."""
+    
+    with open(filename) as f:
+        print(f.readline())
+        rows = []
+        for line in f:
+            row = line.split()
+            row[1:3] = [float(i) for i in row[1:3]]
+            rows.append(row[0:3])
+            
+    return rows
+
+def load_euref(filename):
+    """Loads in the names and locations of EUREF stations."""
+    
+    df = pd.read_csv(filename)
+    names = list(df['Name'])
+    lats = list(df['Latitude'])
+    lons = list(df['Longitude'])
+    stations = list([[names[i], lats[i], lons[i]] for i in range(len(names))])
+    
+    return stations
+    

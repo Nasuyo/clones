@@ -48,6 +48,8 @@ def sh2sh(f_lm, From, To):
         'gravity'... [m/s^2]
     """
     
+    # np.random.seed(7)
+    
     if From == To:
         # print('Well, that was a hard one!')
         return f_lm
@@ -60,11 +62,12 @@ def sh2sh(f_lm, From, To):
     c = scipy.constants.c  # speed of light [m/s]
     rho_e = 3 * M / (4*np.pi * R**3)  # average density of the Earth [kg/m^3]
     rho_w = 1025  # average density of seawater [kg/m^3]
-    
+    cfg.configure()
     # Load love numbers
     with open(cfg.PATHS['lln_path'] + '/lln.json') as f:
         lln = np.array(json.load(f))
     lln_k1 = lln[0:lmax+1,3] + 1
+    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential
     lln_h = lln[0:lmax+1,1]
     
     if From in('pot', 'U', 'N'): 
@@ -76,12 +79,26 @@ def sh2sh(f_lm, From, To):
         elif From == 'ff':
             f_lm = f_lm * c**2 * R / GM
              
-        if To in('pot', 'U', 'N'):
+        if To in('pot', 'U', 'N', 'GRACE'):
+            # if atmo:  # in case the masses are above the clock...
+                # lln_k1[1] = 0.02601378180 + 1  # from CM to CF
+                # lln_k1_atmo[1] = 0.02601378180 - 1  # from CM to CF
+                
+                # f_lm = f_lm.to_array() * lln_k1_atmo.reshape(lmax+1,1) \
+                #     / lln_k1.reshape(lmax+1,1)
+                # f_lm = sh.SHCoeffs.from_array(f_lm)
         # Then: Into the desired format (unless it's 'pot')
             if To == 'U':
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
+            elif To == 'GRACE':
+                f_lm = ddk(f_lm.pad(120) * R, 2)
+                # filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
+                # sigma = shcoeffs_from_netcdf(filename)
+                # sigma = sh2sh(sigma, 'pot', 'N')
+                # f_lm_witherr = np.random.normal(f_lm.coeffs, sigma.coeffs)
+                # f_lm.coeffs = f_lm_witherr
             # Done
             return f_lm
         elif To in('mass', 'sd', 'ewh', 'ewhGRACE'):
@@ -149,7 +166,7 @@ def sh2sh(f_lm, From, To):
                 f_lm = ddk(f_lm.pad(120) * R * rho_e / 3 / rho_w, 3)
             # Done
             return f_lm
-        elif To in('pot', 'U', 'N'):
+        elif To in('pot', 'U', 'N', 'GRACE'):
         # Then: Load love transformation
             mass2pot = lln_k1 / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
             f_lm = f_lm.to_array() * mass2pot.reshape(lmax+1,1)
@@ -158,6 +175,15 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * GM / R
             elif To == 'N':
                 f_lm = f_lm * R
+            elif To == 'GRACE':
+#TODO: this is probs wrong; filter first, then convert to ewh!
+                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120) * R)
+                # filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
+                # sigma = shcoeffs_from_netcdf(filename)
+                # sigma = sh2sh(sigma, 'pot', 'N')
+                # f_lm_witherr = np.random.normal(f_lm.coeffs, sigma.coeffs)
+                # f_lm.coeffs = f_lm_witherr
+                return f_lm
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -318,6 +344,41 @@ def read_SHCoeffs_errors(path, headerlines, k=True):
     sigma = sh.SHCoeffs.from_array(np.transpose(np.dstack((sigmaC, sigmaS)),
                                                  (2, 0, 1)))
     return {'coeffs': coeffs, 'sigma': sigma}
+
+def read_SHCoeffs(path, headerlines, k=True):#D=False):
+    """Reads an ascii file with spherical harmonics.
+    
+    The columns have to be key, L, M, C, S. Returns pyshtools.SHCoeffs object.
+    
+    :type path: str
+    :param path: path to the ascii file
+    :type headerlines: int
+    :param headerlines: number of header lines
+    :rtype: pyshtools.SHCoeffs
+    :rparam: The SHCoeffs, size [2, N+1, N+1]
+    """
+    
+    with open(path) as f:
+        for i in range(headerlines):
+            print(f.readline(), end='')
+        rows = []
+        for line in f:
+            row = line.split()
+            if k:
+                row = [float(i) for i in row[1:]]
+            else:
+                row = [float(i) for i in row]
+            # if D:
+            #     row[3:] = [s.replace('D', 'E') for s in row[3:]]
+            row[0:2] = [int(i) for i in row[0:2]]
+            rows.append(row)
+    N = int(np.sqrt(len(rows)*2)) - 1
+    c = np.zeros((N+1, N+1))
+    s = np.zeros((N+1, N+1))
+    for row in rows:
+        c[row[0], row[1]] = row[2]
+        s[row[0], row[1]] = row[3]  
+    return sh.SHCoeffs.from_array(np.transpose(np.dstack((c, s)), (2, 0, 1)))
 
 def disc_autocovariance(x):
     """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'."""

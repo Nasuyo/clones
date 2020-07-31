@@ -11,6 +11,9 @@ from clones import harmony, cfg, utils
 from time import gmtime, strftime
 import datetime
 import numpy as np
+import scipy.constants
+import pyshtools as sh
+import colorednoise as cn
 import astropy
 import geopy
 import geopy.distance
@@ -69,7 +72,7 @@ class Clock():
             self.states = []
         
     def __repr__(self):
-        """To be printed if instance is written."""
+        """To be printed if instance is pwritten."""
         
         summary = '<clones.Clock>\n'
         summary += 'Location: ' + self.location + '\n'
@@ -101,6 +104,34 @@ class Clock():
         c = astropy.constants.c.value  # [m/s] 
         ff = N * g / c**2  # [s/s]
         return ff
+    
+    def construct_noise(self, N):
+        """Construct noise for the 3 scenarios.
+        
+        Constructs noise in the unitless fractional frequency. Creates a list
+        with 3 numpy arrays, for 3 scenarios. Each array is the sum of 3
+        different noises, clock white noise, gnss white noise, and gnss flicker
+        noise.
+        
+        :param N: length of the time series
+        :type N: int
+        """
+        
+        sigma_clock = np.array([1e-18, 1e-19, 1e-20])
+        sigma_gnss_white = np.array([1, 0.5, 0.2]) * 1e-3 * \
+            scipy.constants.g / scipy.constants.c**2
+        sigma_gnss_flicker = np.array([1, 0.5, 0.2]) * 1e-3 * \
+            scipy.constants.g / scipy.constants.c**2
+        noise_clock = [np.random.normal(0, s, N) for s in
+                       sigma_clock]
+        noise_gnss_white = [np.random.normal(0, s, N) for s in
+                            sigma_gnss_white]
+        noise_gnss_flicker = [cn.powerlaw_psd_gaussian(1, N) * s
+                              for s in sigma_gnss_flicker]
+        noise = [noise_clock[i] + noise_gnss_flicker[i] +
+                 noise_gnss_white[i] for i in range(3)]
+        
+        return noise
     
     def _sh2timeseries(self, F_lm, t, kind, unit, unitTo=[]):
         """Expand spherical harmonics into timeseries at clock location.
@@ -276,7 +307,8 @@ class Clock():
         esc_dict = {'I': 'oggm_',
                     'I_scandinavia': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
         
         # TODO: Check whether the timeseries is already there
         
@@ -300,12 +332,15 @@ class Clock():
             f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
             f_lm_ref = harmony.shcoeffs_from_netcdf(path + esc_dict[esc]
                                                     + t_ref)
-            f_lm = f_lm - f_lm_ref
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+            f_lm_ref = harmony.sh2sh(f_lm_ref, unitFrom, unitTo)
             if lmin:
                 f_lm = f_lm - f_lm.pad(lmin).pad(f_lm.lmax)
+                f_lm_ref = f_lm_ref - f_lm_ref.pad(lmin).pad(f_lm_ref.lmax)
             if lmax:
                 f_lm = f_lm.pad(lmax).pad(f_lm.lmax)
-            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+                f_lm_ref = f_lm_ref.pad(lmax).pad(f_lm_ref.lmax)
+            f_lm = f_lm - f_lm_ref
             series.append(f_lm.expand(lat=self.lat, lon=self.lon))
         
         try:
@@ -316,7 +351,7 @@ class Clock():
         if filt:
             series = utils.ma(np.array(series), filt)
         if sigma:
-            noise = [np.random.normal(0, s, len(series)) for s in sigma]
+            noise = self.construct_noise(len(series))
             if filt:
                 noise = [utils.ma(noi, filt) for noi in noise]
             return T_date, series, noise
@@ -385,10 +420,10 @@ class Clock():
                     if unitTo in('N', 'h', 'GRACE'):
                         data = [i * 1e3 for i in data]
                         noise = [i * 1e3 for i in noise] # noise muss arrays sein in der liste
-                    for noi, sig in zip(noise, sigma):
+                    plt.plot(T, data, label=e, linewidth=0.5)
+                    for i, (noi, sig) in enumerate(zip(noise[:-1], sigma[:-1])):
                         plt.plot(T, data+noi, ':', linewidth=1,
-                                 label='noise at $\sigma$='+str(sig))
-                    plt.plot(T, data, label=e, linewidth=2)
+                                 label='noise scenario ' + str(i+1))
             else:
                 T, data, noise = self.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
@@ -396,10 +431,17 @@ class Clock():
                 if unitTo in('N', 'h', 'GRACE'):
                     data = [i * 1e3 for i in data]
                     noise = [i * 1e3 for i in noise]
-                for noi, sig in zip(noise, sigma):
-                    plt.plot(T, data+noi, ':', linewidth=1,
-                             label='noise at $\sigma$='+str(sig))
-                p = plt.plot(T, data, label=esc, linewidth=2)
+                p = plt.plot(T, data, label=esc, linewidth=1.5, zorder=0)
+                if sigma==3:
+                    for i, noi in enumerate(noise):
+                        color = np.array(['tab:orange', 'tab:red', 'tab:brown'])[i]
+                        plt.plot(T, data+noi, linewidth=0.5, color=color,
+                                 label=esc + ' + noise scenario ' + str(i+1))
+                else:
+                    for i, noi in enumerate(noise[:-1]):
+                        color = np.array(['tab:orange', 'tab:red'])[i]
+                        plt.plot(T, data+noi, linewidth=0.5, color=color,
+                                 label=esc + ' + noise scenario ' + str(i+1))
         else:
             if isinstance(esc, list):
                 for e in esc:
@@ -490,7 +532,7 @@ class Clock():
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         
         if sigma:
-            if type(esc) is list:
+            if type(esc) is list:  # DEPRECATED!
                 for e in esc:
                     T, data, noise = self.sh2timeseries(
                         T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
@@ -510,26 +552,38 @@ class Clock():
                     for lvl, sig in zip(noise_level, sigma):
                         plt.plot(f*86400*365, lvl,
                                  label='noise level for $\sigma$='+str(sig))
-                    p = plt.plot(f*86400*365, freq, '.-', label=e)
+                    p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
-                T, data, noise = self.sh2timeseries(
+                # T, data, noise = self.sh2timeseries(
+                #     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
+                #     error=error, sigma=sigma, filt=filt)
+                # f, freq = harmony.time2freq(delta_t, data)
+                # # f, noisy_freq = harmony.time2freq(delta_t, data+noise)
+                # noise_level = []
+                # for noi in noise:
+                #     fn, noisy = harmony.time2freq(delta_t, noi)
+                #     noise_level.append(np.mean(noisy) * np.ones(len(f)))
+                # if fmax:
+                #     f, freq, noise_level = (f[:fmax], freq[:fmax],
+                #                             [n[:fmax] for n in noise_level])
+                # # plt.plot(f*86400*365, noisy_freq, 'x', label=e+' + noise',
+                # #          color=p[0].get_color())
+                # for lvl, sig in zip(noise_level, sigma):
+                #     plt.plot(f*86400*365, lvl,
+                #              label='noise level for $\sigma$='+str(sig))
+                # p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
+                T, data = self.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    error=error, sigma=sigma, filt=filt)
+                    filt=filt)
                 f, freq = harmony.time2freq(delta_t, data)
-                # f, noisy_freq = harmony.time2freq(delta_t, data+noise)
-                noise_level = []
-                for noi in noise:
-                    fn, noisy = harmony.time2freq(delta_t, noi)
-                    noise_level.append(np.mean(noisy) * np.ones(len(f)))
                 if fmax:
-                    f, freq, noise_level = (f[:fmax], freq[:fmax],
-                                            [n[:fmax] for n in noise_level])
-                # plt.plot(f*86400*365, noisy_freq, 'x', label=e+' + noise',
-                #          color=p[0].get_color())
-                for lvl, sig in zip(noise_level, sigma):
-                    plt.plot(f*86400*365, lvl,
-                             label='noise level for $\sigma$='+str(sig))
-                p = plt.plot(f*86400*365, freq, '.-', label=esc)
+                    f, freq = f[:fmax], freq[:fmax]
+                noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+                plt.plot(f[1:]*86400*365, noise[0, :], '--', color='black',
+                         label='noise levels')
+                plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
+                plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
+                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
         else:
             if type(esc) is list:
                 for e in esc:
@@ -539,7 +593,7 @@ class Clock():
                     f, freq = harmony.time2freq(delta_t, data)
                     if fmax:
                         f, freq = f[:fmax], freq[:fmax]
-                    plt.plot(f*86400*365, freq, '.-', label=e)
+                    plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
                 T, data = self.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
@@ -547,12 +601,15 @@ class Clock():
                 f, freq = harmony.time2freq(delta_t, data)
                 if fmax:
                     f, freq = f[:fmax], freq[:fmax]
-                plt.plot(f*86400*365, freq, '.-', label=esc)
+                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
         
         plt.title(self.location)
         plt.xlabel('Frequencies [1/yr]')
+        plt.yscale('log')
+        plt.xscale('log')
         plt.ylabel(unit_dict[unitTo])
         plt.grid()
+        # plt.legend(loc='lower left')
         plt.legend()
         plt.tight_layout()
         
@@ -990,10 +1047,18 @@ class Link():
                     data_a, data_b, noise = (
                         data_a * 1e3, data_b * 1e3, [noi * 1e3 for noi in 
                                                      noise])
-                for noi, sig in zip(noise, sigma):
-                    plt.plot(T, data+noi, ':', linewidth=1,
-                             label='noise at $\sigma$='+str(sig))
-                plt.plot(T, data, label=esc)
+                p = plt.plot(T, data, label=esc, linewidth=1.5, zorder=0)
+                if sigma==3:
+                    for i, noi in enumerate(noise):
+                        color = np.array(['tab:orange', 'tab:red', 'tab:brown'])[i]
+                        plt.plot(T, data+noi, linewidth=0.5, color=color,
+                                 label=esc + ' + noise scenario ' + str(i+1))
+                else:
+                    for i, noi in enumerate(noise[:-1]):
+                        color = np.array(['tab:orange', 'tab:red'])[i]
+                        plt.plot(T, data+noi, linewidth=0.5, color=color,
+                                 label=esc + ' + noise scenario ' + str(i+1))
+                    
         else:
             if type(esc) is list:
                 for e in esc:
@@ -1128,35 +1193,27 @@ class Link():
                     for lvl, sig in zip(noise_level, sigma):
                         plt.plot(f*86400*365, lvl,
                                  label='noise level for $\sigma$='+str(sig))
-                    p = plt.plot(f*86400*365, freq, '.-', label=e)
+                    p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
-                T_a, data_a, noise_a = self.a.sh2timeseries(
+                T_a, data_a = self.a.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt, error=error, sigma=sigma)
-                T_b, data_b, noise_b = self.b.sh2timeseries(
+                    filt=filt)
+                T_b, data_b = self.b.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt, error=error, sigma=sigma)
+                    filt=filt)
                 data_a, data_b = np.array(data_a), np.array(data_b)
                 data = data_b - data_a
-                noise = np.array(noise_a) + np.array(noise_b)
                 f, freq = harmony.time2freq(delta_t, data)
                 # f, noisy_freq = harmony.time2freq(delta_t, data+noise)
-                noise_level = []
-                for noi in noise:
-                    fn, noisy = harmony.time2freq(delta_t, noi)
-                    noise_level.append(np.mean(noisy) * np.ones(len(f)))
                 if fmax:
-                    f, freq, noise_level = (f[:fmax], freq[:fmax],
-                                            [n[:fmax] for n  in noise_level])
-                # plt.plot(f*86400*365, noisy_freq, 'x', label=e+' + noise',
-                #          color=p[0].get_color())
-                # plt.plot(f*86400*365, noise_level, label='noise level for $\sigma$='+str(sigma),
-                #          color=p[0].get_color())
-                # plt.xscale('log')
-                for lvl, sig in zip(noise_level, sigma):
-                    plt.plot(f*86400*365, lvl,
-                             label='noise level for $\sigma$='+str(sig))
-                p = plt.plot(f*86400*365, freq, '.-', label=esc)
+                    f, freq = (f[:fmax], freq[:fmax])
+                noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+                noise = noise * np.sqrt(2)
+                plt.plot(f[1:]*86400*365, noise[0, :], '--', color='black',
+                         label='noise levels')
+                plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
+                plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
+                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
         else:
             if type(esc) is list:
                 for e in esc:
@@ -1171,7 +1228,7 @@ class Link():
                     f, freq = harmony.time2freq(delta_t, data)
                     if fmax:
                         f, freq, (f[:fmax], freq[:fmax])
-                    p = plt.plot(f*86400*365, freq, '.-', label=e)
+                    p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
                 T_a, data_a = self.a.sh2timeseries(
                     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
@@ -1184,13 +1241,16 @@ class Link():
                 f, freq = harmony.time2freq(delta_t, data)
                 if fmax:
                     f, freq = (f[:fmax], freq[:fmax])
-                p = plt.plot(f*86400*365, freq, '.-', label=esc)
+                p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
         
         plt.title(self.b.location + ' - ' + self.a.location)
+        plt.xscale('log')
+        plt.yscale('log')
         plt.xlabel('Frequencies [1/yr]')
         plt.ylabel(unit_dict[unitTo])
         plt.grid()
-        plt.legend()
+        # plt.legend()
+        plt.legend(loc='lower left')
         plt.tight_layout()
         
         if save:
@@ -1500,21 +1560,21 @@ class Network():
                     s0 = True
             elif l.state == 1:
                 if s1:
-                    fig.plot(x, y, pen="1p,black,-")
+                    fig.plot(x, y, pen="1p,blue,-")
                 else:
-                    fig.plot(x, y, pen="1p,black,-", label='"Phase 1"')
+                    fig.plot(x, y, pen="1p,blue,-")#, label='"Phase 1"')
                     s1 = True
             elif l.state == 2:
                 if s2:
-                    fig.plot(x, y, pen="1p,black,-.")
+                    fig.plot(x, y, pen="1p,blue,-")
                 else:
-                    fig.plot(x, y, pen="1p,black,-.", label='"Phase 2"')
+                    fig.plot(x, y, pen="1p,blue,-")#, label='"Phase 2"')
                     s2 = True
-            elif l.state == 9:
+            elif l.state in [1, 2, 9]:
                 if s9:
                     fig.plot(x, y, pen="1p,blue,-")
                 else:
-                    fig.plot(x, y, pen="1p,blue,-", label='Possible')
+                    fig.plot(x, y, pen="1p,blue,-")
                     s9 = True
             
         for clo in self.clocks:
@@ -1526,11 +1586,15 @@ class Network():
                 fig.text(x=clo.lon-3.3, y=clo.lat+1, text=clo.location, region=region,
                          projection=projection, font='12p,Helvetica,black',
                          justify='LT')
+            elif clo.location == 'Posen':
+                fig.text(x=clo.lon+0.3, y=clo.lat, text='Poznan', region=region,
+                         projection=projection, font='12p,Helvetica,black',
+                         justify='LT')
             else:
                 fig.text(x=clo.lon+0.3, y=clo.lat, text=clo.location, region=region,
                          projection=projection, font='12p,Helvetica,black',
                          justify='LT')
-        fig.legend(position='g2/58', box='+gwhite+p1p')
+        fig.legend(position='g2/60', box='+gwhite+p1p')
         
         if save:
             fig.savefig('/home/schroeder/CLONETS/fig/clonets_gmt.pdf')
@@ -1538,7 +1602,7 @@ class Network():
         return fig
     
     def plotESC(self, esc, t, unitFrom, unitTo, t_ref=None, save=False,
-                degreevariances=False, relief=False):
+                degreevariances=False, relief=False, lmin=False, lmax=False):
         """Plots the earth system component signal on a map.
         
         :param esc: earth system component
@@ -1599,6 +1663,13 @@ class Network():
                 os.path.join(path, esc, esc_dict[esc] + t_ref + '.nc'))
             f_lm.coeffs = f_lm.coeffs - f_lm_ref.coeffs
         f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+        if lmin or lmax:
+            if lmin and not lmax:
+                f_lm = f_lm.pad(720) - f_lm.pad(lmin).pad(720)
+            elif lmax and not lmin:
+                f_lm = f_lm.pad(lmax).pad(720)
+            elif lmin and lmax:
+                f_lm = f_lm.pad(lmax).pad(720) - f_lm.pad(lmin).pad(720)
         
         if degreevariances:
             return f_lm
@@ -1606,41 +1677,36 @@ class Network():
         grid = f_lm.pad(720).expand()
         if unitTo in('N', 'h', 'GRACE'):
             grid.data = grid.data * 1e3
-        data = grid.to_array()
-        x = grid.lons()
-        y = grid.lats()
-        # find out what the datalimits are within the shown region
-        data_lim = np.concatenate((data[200:402, -81:],
-                                   data[200:402, :242]), axis=1)
-        datamax = np.max(abs(data_lim))
         
-        da = xr.DataArray(data, coords=[y, x], dims=['lat', 'lon'])
-        # save the dataarray as netcdf to work around the 360° plotting problem
-        da.to_dataset(name='dataarray').to_netcdf(path + 'temp/pygmt.nc')
-        fig = pygmt.Figure()
-        if relief:
-            relief_grid = pygmt.datasets.load_earth_relief('02m')
-            pygmt.makecpt(cmap='gray', series=[0, 5000], reverse=True)
-            fig.grdimage(relief_grid, region=[-10, 30, 40, 65],
-                         projection="S10/90/6i", frame="ag")
-        pygmt.makecpt(cmap='polar', series=[-datamax, datamax], reverse=True)
-        fig.grdimage(path + 'temp/pygmt.nc', region=[-10, 30, 40, 65],
-                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
-        fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
-                  shorelines="1/0.1p,black", borders="1/0.1p,black")
-        fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
-                 pen="black")
-        # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig = self.plot_europe_720(grid, path+esc+'/', '', esc, unitTo,
+                                   cb_dict, 'esc', t)
         
         if save:
-            if t_ref:
-                fig.savefig(os.path.join(savepath, esc, esc_dict[esc] + t
-                                         + '-' + t_ref + '_' + unitTo + '.pdf'))    
+            if save=='png':
+                if t_ref:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t + '-'
+                                             + t_ref + '_' + unitTo + '.png'))
+                else:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t
+                                             + '_' + unitTo + '.png'))
+                if lmin:
+                    savename = savename[:-4] + 'lmin' + str(lmin) + '.png'
+                if lmax:
+                    savename = savename[:-4] + 'lmax' + str(lmax) + '.png'
+                fig.savefig(savename)
             else:
-                fig.savefig(os.path.join(savepath, esc, esc_dict[esc] + t
-                                         + '_' + unitTo + '.pdf'))
-        return fig, data
+                if t_ref:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t + '-'
+                                             + t_ref + '_' + unitTo + '.pdf'))
+                else:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t
+                                             + '_' + unitTo + '.pdf'))
+                if lmin:
+                    savename = savename[:-4] + 'lmin' + str(lmin) + '.pdf'
+                if lmax:
+                    savename = savename[:-4] + 'lmax' + str(lmax) + '.pdf'
+                fig.savefig(savename)
+        return fig, grid
     
     def plotESCatClocks(self, esc, t, unitFrom, unitTo, t_ref=None,
                         loc_ref=False, save=False):
@@ -1687,7 +1753,8 @@ class Network():
                      'GRACE': '"Geoid height [mm]"'}
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
 
         path = cfg.PATHS['data_path']
         savepath = path + '../fig/'
@@ -1715,18 +1782,19 @@ class Network():
         if unitTo in('N', 'h', 'GRACE'):
             points = points * 1e3
         datamax = max(abs(points))
+        print(points)
         
         data = {'data': points, 'lat': self.lats(), 'lon': self.lons()}
         df = pd.DataFrame(data)
 
         fig = pygmt.Figure()
-        pygmt.makecpt(cmap='polar', series=[-datamax, datamax], reverse=True)
+        pygmt.makecpt(cmap='roma', series=[-datamax, datamax], reverse=False)
         fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
                   shorelines="1/0.1p,black", borders="1/0.1p,black",
                   land='grey')
         # TODO: könnte colorbar zero nicht in der mitte haben... überprüfen!
-        fig.plot(x=df.lon, y=df.lat, style='c0.13i', color=-df.data/datamax,
-                 cmap='polar')
+        fig.plot(x=df.lon, y=df.lat, style='c0.13i', color=(df.data/4.05+1)/2,
+                 cmap='roma')
         fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         if save:
@@ -1741,7 +1809,7 @@ class Network():
         return fig, points
     
     def plotRMS(self, T, esc, unitFrom, unitTo, reset=False, save=False,
-                trend=None, lmin=False, lmax=False):
+                trend=None, lmin=False, lmax=False, hourly=False):
         """Plots the Root Mean Square on a map.
         
         Expands the spherical harmonics from the data folder for each grid
@@ -1815,10 +1883,14 @@ class Network():
         
 #        if isinstance(T[0], str):
 #            T = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
-#        T_frac = np.array([utils.datetime2frac(t) for t in T])
+        T_frac = np.array([utils.datetime2frac(t) for t in T])
         # make strings if time is given in datetime objects
         if not isinstance(T[0], str):
-            T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+            if hourly:
+                T = [datetime.datetime.strftime(t, format='%Y_%m_%d_%H')
+                     for t in T]
+            else:
+                T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
         
         path = cfg.PATHS['data_path'] + esc + '/'
         f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
@@ -1831,12 +1903,6 @@ class Network():
         for t in T:
             f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
             f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
-            if unitTo == 'GRACE':
-                filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
-                sigma = harmony.shcoeffs_from_netcdf(filename)
-                sigma = harmony.sh2sh(sigma, 'pot', 'N')
-                f_lm_witherr = np.random.normal(f_lm.coeffs, sigma.coeffs)
-                f_lm.coeffs = f_lm_witherr
             if lmin or lmax:
                 if lmin and not lmax:
                     f_lm = f_lm.pad(720) - f_lm.pad(lmin).pad(720)
@@ -1901,7 +1967,8 @@ class Network():
             data = data * 1e3
         grid.data = data
         
-        fig = self.plot_europe_720(grid, path, trend, esc, unitTo, cb_dict)
+        fig = self.plot_europe_720(grid, path, trend, esc, unitTo, cb_dict,
+                                   'rms', '')
         
         if save:
             savepath = path + '../../fig/'
@@ -2088,14 +2155,14 @@ class Network():
                           reverse=True)
         else:
             pygmt.makecpt(cmap='drywet', series=[datamin, datamax])
-        fig.grdimage(path + '../temp/pygmt.nc', region=[-6, 31, 40, 65],
+        fig.grdimage(path + '../temp/pygmt.nc', region=[-15, 40, 40, 65],
                      projection="M10i")  # frame: a for the standard frame, g for the grid lines
         if esc == 'H' or esc == 'I' and unitTo == 'ewh':
-            fig.coast(region=[-6, 31, 40, 65], projection="M10i",
+            fig.coast(region=[-15, 40, 40, 65], projection="M10i",
                       shorelines="1/0.1p,black",
                       borders="1/0.2p,black", water='white')
         else:
-            fig.coast(region=[-6, 31, 40, 65], projection="M10i",
+            fig.coast(region=[-15, 40, 40, 65], projection="M10i",
                       shorelines="1/0.1p,black",
                       borders="1/0.2p,black")
         nmis = [0, 5, 6, 7, 9, 10, 12, 11, 13, 15, 17, 18]
@@ -2244,7 +2311,7 @@ class Network():
                  cmap='drywet')
         # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
         fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
-        
+
         if save:
             savepath = path + '../../fig/'
             savename = (os.path.join(savepath, esc, esc_dict[esc] + T[0] + '-'
@@ -2312,7 +2379,8 @@ class Network():
         plt.tight_layout()
         
     def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-                       reset=False, loc=False, loc_ref=False):
+                       reset=False, loc=False, loc_ref=False, lmin=False,
+                       lmax=False):
         """Plots time series at each clock location.
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
@@ -2350,6 +2418,7 @@ class Network():
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
+                    'GRACE': 'Geoid height [mm]',
                     'h': 'Elevation [mm]',
                     'sd': 'Surface Density [kg/m$^2$]',
                     'ewh': 'Equivalent water height [m]',
@@ -2357,20 +2426,23 @@ class Network():
                     'ff': 'Fractional frequency [-]'}
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
+        next(ax._get_lines.prop_cycler)
 
         if loc_ref:
             next(ax._get_lines.prop_cycler)
             clo = self.search_clock('location', loc_ref)[0]
-            T_ref, data_ref = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                t_ref=t_ref, reset=reset)
+            T_ref, data_ref = clo.sh2timeseries(
+                T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset, lmin=lmin,
+                lmax=lmax)
             data_ref = np.array(data_ref)
             if unitTo in('N', 'h', 'GRACE'):
                 data_ref = data_ref * 1e3
                 
         for number, clo in enumerate(self.clocks):
             if (loc and clo.location in loc) or loc==False:
-                T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                            t_ref=t_ref, reset=reset)
+                T, data = clo.sh2timeseries(
+                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
+                    lmin=lmin, lmax=lmax)
                 data = np.array(data)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = data * 1e3
@@ -2388,14 +2460,15 @@ class Network():
                     plt.plot(T, data, label=clo.location)
             else:
                 number -= 1
-        # clo = self.search_clock('location', 'Braunschweig')[0]
-        # T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-        #                             t_ref=t_ref)
-        # data = np.array(data)
-        # if unitTo in('N', 'h', 'GRACE'):
-        #     data = data * 1e3
-        # plt.plot(T, data, label=clo.location, linewidth=2.5, color='tab:blue')
+        clo = self.search_clock('location', 'Braunschweig')[0]
+        T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
+                                    t_ref=t_ref)
+        data = np.array(data)
+        if unitTo in('N', 'h', 'GRACE'):
+            data = data * 1e3
+        plt.plot(T, data, label=clo.location, linewidth=2.5, color='tab:blue')
         
+        plt.ylim([-0.42, 0.34])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
         plt.title(esc)
@@ -2479,7 +2552,7 @@ class Network():
                 f, freq = harmony.time2freq(delta_t, data)
                 if fmax:
                     f, freq = (f[:fmax], freq[:fmax])
-                plt.plot(f*86400*365, freq, '.-', label=clo.location)
+                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=clo.location)
             else:
                 number -= 1
                 
@@ -2495,10 +2568,13 @@ class Network():
             else:
                 plt.plot(f*86400*365, noise_level, '--', color='k')
         
+        plt.xscale('log')
+        plt.yscale('log')
         plt.xlabel('Frequencies [1/yr]')
         plt.ylabel(unit_dict[unitTo])
         plt.grid()
-        plt.legend()
+        # plt.legend()
+        plt.legend(loc='lower left')
         plt.tight_layout()
         
         if save:
@@ -2507,8 +2583,71 @@ class Network():
             plt.savefig(path)
         
         return fig
+
+    def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, save=False):
         
-    def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict):
+        unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
+                    'N': 'Geoid height [mm]',
+                    'h': 'Elevation [mm]',
+                    'sd': 'Surface Density [kg/m$^2$]',
+                    'ewh': 'Equivalent water height [m]',
+                    'gravity': 'gravitational acceleration [m/s$^2$]',
+                    'ff': 'Fractional frequency [-]'}
+        t0 = datetime.date(2007, 1, 1)
+        T = [t0 + datetime.timedelta(d) for d in range(0, 365)]
+        t_ref = '2007'
+        # clocks        
+        clo0 = self.search_clock('location', 'Braunschweig')[0]
+        clo1 = self.search_clock('location', loc)[0]
+        
+        t, data0 = clo0.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
+        t, data1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
+        data = (np.array(data1) - np.array(data0)) * 1e3
+        sigma = (1e-19 * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
+                 sh.constant.r3_wgs84.value**2 * 1e3 * np.sqrt(2))  # [mm]
+        # GRACE
+        T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
+        files = ['/home/schroeder/CLONETS/data/ITSG-Grace2018_n120_2007-'
+                  + f'{d:02}' + 'sigma.nc' for d in range(1, 13)]
+        sigma_grace = [harmony.sh2sh(harmony.shcoeffs_from_netcdf(f), 'pot', 'GRACE')
+                        for f in files]
+        s_grace = 1e3 * np.array(
+            [np.sqrt(s.pad(120).expand(lat=clo0.lat, lon=clo0.lon)**2
+              + s.pad(120).expand(lat=clo1.lat, lon=clo1.lon)**2)
+              for s in sigma_grace])
+        
+        tm, grace0 = clo0.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
+        tm, grace1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
+        tm = [x + datetime.timedelta(14) for x in tm]
+        grace = 1e3 * (np.array(grace1) - np.array(grace0))
+                
+        plt.rcParams.update({'font.size': 13})  # set before making the figure!        
+        fig, ax = plt.subplots()
+        
+        plt.plot(t, data, label='clocks')
+        plt.plot(tm, grace, label='GRACE')
+        plt.fill_between(t, data+sigma, data-sigma, alpha=0.3, color='tab:blue')
+        plt.fill_between(tm, grace+s_grace, grace-s_grace, alpha=0.3, color='tab:orange')
+       
+        plt.ylim([-13, 8.5])
+        plt.ylabel(unit_dict[unitTo])
+        plt.xticks(rotation=90)
+        plt.grid()
+        plt.legend()
+        plt.tight_layout()
+        
+        path = cfg.PATHS['data_path'] + '/'
+
+        if save:
+            savepath = path + '../fig/'
+            savename = (os.path.join(savepath, 'timeseries', esc + '_wsigma_'
+                                     + loc + '.pdf'))
+            plt.savefig(savename)
+        
+        return fig
+        
+    def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
+                        inp_func, t):
         
         x = grid.lons()
         y = grid.lats()
@@ -2516,6 +2655,7 @@ class Network():
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
+        # datamax = 10  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -2524,11 +2664,13 @@ class Network():
         if trend == 'trend':
             pygmt.makecpt(cmap='polar', series=[-datamax, datamax],
                           reverse=True)
+        elif inp_func == 'esc':
+            pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
         else:
             pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
         fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
                      projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
-        if esc == 'H' or esc == 'I' and unitTo == 'ewh':
+        if (esc == 'H' or esc == 'I') and unitTo == 'ewh':
             fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
                       frame="a", shorelines="1/0.1p,black",
                       borders="1/0.1p,black", water='white')
@@ -2538,6 +2680,6 @@ class Network():
                       borders="1/0.1p,black")
         fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
                  pen="black")
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(frame='paf+l' + cb_dict[unitTo]+t)  # @+x@+ for ^x
         
         return fig
