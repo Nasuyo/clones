@@ -119,6 +119,26 @@ def ma(x, width):
         
     return x_filtered
 
+def daily2monthly(t, data):
+    """Averages daily to monthly data."""
+# TODO: Maybe add tm as return
+    day = 0
+    dayinmonth = 1
+    datam = np.zeros(12)
+    for month in range(1, 13):
+        try:
+            while t[day].month == month:
+                datam[month-1] += data[day]
+                day += 1
+                dayinmonth += 1
+        except:
+            pass
+        datam[month-1] = datam[month-1] / (dayinmonth-1)
+        month += 1
+        dayinmonth = 1
+            
+    return datam
+
 def datetime2frac(date):
     """Convert a datetime.datetime object into a floating year.
     

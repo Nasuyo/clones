@@ -45,6 +45,8 @@ def sh2sh(f_lm, From, To):
         'mass' ... dimensionless surface loading coeffs
             'sd' ... surface density [kg/m^2]
             'ewh' ... equivalent water height [m]
+            'ewhGRACE' ... equivalent water height [m], but with lmax=120 and
+                           filtered
         'gravity'... [m/s^2]
     """
     
@@ -67,7 +69,7 @@ def sh2sh(f_lm, From, To):
     with open(cfg.PATHS['lln_path'] + '/lln.json') as f:
         lln = np.array(json.load(f))
     lln_k1 = lln[0:lmax+1,3] + 1
-    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential
+    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential --> relic from a wrong belief, Voigt et al (2016) were kind of right...
     lln_h = lln[0:lmax+1,1]
     
     if From in('pot', 'U', 'N'): 
@@ -76,7 +78,7 @@ def sh2sh(f_lm, From, To):
             f_lm = f_lm * R / GM
         elif From == 'N':
              f_lm = f_lm / R
-        elif From == 'ff':
+        elif From == 'ff':  # here, the vertical uplift part is kinda missing..
             f_lm = f_lm * c**2 * R / GM
              
         if To in('pot', 'U', 'N', 'GRACE'):
@@ -104,15 +106,17 @@ def sh2sh(f_lm, From, To):
         elif To in('mass', 'sd', 'ewh', 'ewhGRACE'):
             # Then: Load love transformation
             lln_k1[1] = 0.02601378180 + 1  # from CM to CF
-            pot2mass = (2*np.arange(0,lmax+1)+1) / lln_k1  # upweight high degrees
+            pot2mass = (2*np.arange(0,lmax+1)+1) / lln_k1  # upweigh high degrees
+            if To == 'ewhGRACE':
+                f_lm = ddk(f_lm.pad(120), 3)
+                pot2mass = pot2mass[:121]
+                lmax = 120
             f_lm = f_lm.to_array() * pot2mass.reshape(lmax+1,1)
             # And then: Into the desired format (unless it's 'mass')
             if To == 'sd':
                 f_lm = f_lm * R * rho_e / 3
-            elif To == 'ewh':
+            elif To == 'ewh' or To == 'ewhGRACE':
                 f_lm = f_lm * R * rho_e / 3 / rho_w
-            elif To == 'ewhGRACE':
-                f_lm = ddk(f_lm.pad(120) * R * rho_e / 3 / rho_w, 3)
             # Done
             return sh.SHCoeffs.from_array(f_lm)
         elif To == 'h':
@@ -145,7 +149,7 @@ def sh2sh(f_lm, From, To):
             f_lm_h = (sh.SHCoeffs.to_array(f_lm) * pot2def.reshape(lmax+1,1)
                       * R * (-2))
             f_lm_h = f_lm_h * GM / R**3
-            return sh.SHCoeffs.from_array(-f_lm_h + f_lm_pot)
+            return sh.SHCoeffs.from_array(f_lm_h - f_lm_pot)
         else:
             print('Choose a proper output unit!')
         
@@ -162,7 +166,7 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * R * rho_e / 3
             elif To == 'ewh':
                 f_lm = f_lm * R * rho_e / 3 / rho_w
-            elif To == 'ewhGRACE':
+            elif To == 'ewhGRACE':  # TODO: correct this so that it is filtered in potential format
                 f_lm = ddk(f_lm.pad(120) * R * rho_e / 3 / rho_w, 3)
             # Done
             return f_lm
@@ -177,7 +181,7 @@ def sh2sh(f_lm, From, To):
                 f_lm = f_lm * R
             elif To == 'GRACE':
 #TODO: this is probs wrong; filter first, then convert to ewh!
-                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120) * R)
+                f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120) * R, 3)
                 # filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
                 # sigma = shcoeffs_from_netcdf(filename)
                 # sigma = sh2sh(sigma, 'pot', 'N')
@@ -216,9 +220,9 @@ def sh2sh(f_lm, From, To):
             mass2def = lln_h / (2*np.arange(0,lmax+1)+1)  # downweight high degrees
             f_lm_h = (sh.SHCoeffs.to_array(f_lm) * mass2def.reshape(lmax+1,1)
                       * R * (-2))
-            f_lm_h = -f_lm_h * GM / R**3
+            f_lm_h = f_lm_h * GM / R**3
             # Done
-            return sh.SHCoeffs.from_array(-f_lm_h + f_lm_pot)
+            return sh.SHCoeffs.from_array(f_lm_h - f_lm_pot)
         else:
             print('Choose a proper output unit!')
        
@@ -234,7 +238,7 @@ def sh2sh(f_lm, From, To):
         print('NOT YET IMPLEMENTED!')  # TODO
         return f_lm
     
-    elif From == 'GRACE':
+    elif From == 'GRACE' or From == 'ewhGRACE':
         print('Not possible with a DDK filter')  # TODO
         return f_lm
     
@@ -345,7 +349,7 @@ def read_SHCoeffs_errors(path, headerlines, k=True):
                                                  (2, 0, 1)))
     return {'coeffs': coeffs, 'sigma': sigma}
 
-def read_SHCoeffs(path, headerlines, k=True):#D=False):
+def read_SHCoeffs(path, headerlines, k=True, lastline=False):#D=False):
     """Reads an ascii file with spherical harmonics.
     
     The columns have to be key, L, M, C, S. Returns pyshtools.SHCoeffs object.
@@ -372,12 +376,20 @@ def read_SHCoeffs(path, headerlines, k=True):#D=False):
             #     row[3:] = [s.replace('D', 'E') for s in row[3:]]
             row[0:2] = [int(i) for i in row[0:2]]
             rows.append(row)
+    if lastline:
+        rows.pop()
     N = int(np.sqrt(len(rows)*2)) - 1
     c = np.zeros((N+1, N+1))
     s = np.zeros((N+1, N+1))
+    # print(N)
+    # print(np.shape(c))
+    # print(len(rows))
     for row in rows:
+        # print(row[0], row[1])
         c[row[0], row[1]] = row[2]
-        s[row[0], row[1]] = row[3]  
+        s[row[0], row[1]] = row[3]
+        # if row[0] == 96 and row[1] == 96:
+        #     pass
     return sh.SHCoeffs.from_array(np.transpose(np.dstack((c, s)), (2, 0, 1)))
 
 def disc_autocovariance(x):

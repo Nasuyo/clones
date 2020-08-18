@@ -1881,9 +1881,9 @@ class Network():
                          'ff': '"Fractional frequency [-]"',
                          'GRACE': '"Geoid height [mm]"'}
         
-#        if isinstance(T[0], str):
-#            T = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
-        T_frac = np.array([utils.datetime2frac(t) for t in T])
+        if isinstance(T[0], str):
+            T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
         # make strings if time is given in datetime objects
         if not isinstance(T[0], str):
             if hourly:
@@ -2426,8 +2426,9 @@ class Network():
                     'ff': 'Fractional frequency [-]'}
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
-        next(ax._get_lines.prop_cycler)
-
+        # next(ax._get_lines.prop_cycler)
+        
+        T_str = T.copy()
         if loc_ref:
             next(ax._get_lines.prop_cycler)
             clo = self.search_clock('location', loc_ref)[0]
@@ -2441,7 +2442,7 @@ class Network():
         for number, clo in enumerate(self.clocks):
             if (loc and clo.location in loc) or loc==False:
                 T, data = clo.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
+                    T_str, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
                     lmin=lmin, lmax=lmax)
                 data = np.array(data)
                 if unitTo in('N', 'h', 'GRACE'):
@@ -2460,15 +2461,15 @@ class Network():
                     plt.plot(T, data, label=clo.location)
             else:
                 number -= 1
-        clo = self.search_clock('location', 'Braunschweig')[0]
-        T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                    t_ref=t_ref)
-        data = np.array(data)
-        if unitTo in('N', 'h', 'GRACE'):
-            data = data * 1e3
-        plt.plot(T, data, label=clo.location, linewidth=2.5, color='tab:blue')
+        # clo = self.search_clock('location', 'Braunschweig')[0]
+        # T, data = clo.sh2timeseries(T_str, esc, unitFrom, unitTo,
+        #                             t_ref=t_ref)
+        # data = np.array(data)
+        # if unitTo in('N', 'h', 'GRACE'):
+        #     data = data * 1e3
+        # plt.plot(T, data, label=clo.location, linewidth=2.5, color='tab:blue')
         
-        plt.ylim([-0.42, 0.34])
+        # plt.ylim([-0.42, 0.34])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
         plt.title(esc)
@@ -2484,7 +2485,7 @@ class Network():
     
     def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
                             fmax=False,  t_ref=False, loc=False,
-                            loc_ref=False, save=False):
+                            loc_ref=False, save=False, lmin=False, lmax=False):
         """Plots the spectral domain of the time series at clock location.
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
@@ -2531,19 +2532,21 @@ class Network():
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
         
+        T_str = T.copy()
         if loc_ref:
             next(ax._get_lines.prop_cycler)
             clo = self.search_clock('location', loc_ref)[0]
             T_ref, data_ref = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                t_ref=t_ref)
+                                                t_ref=t_ref, lmin=lmin,
+                                                lmax=lmax)
             data_ref = np.array(data_ref)
             if unitTo in('N', 'h', 'GRACE'):
                 data_ref = data_ref * 1e3
         
         for number, clo in enumerate(self.clocks):
             if (loc and clo.location in loc) or loc==False:
-                T, data = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                            t_ref=t_ref)
+                T, data = clo.sh2timeseries(T_str, esc, unitFrom, unitTo,
+                                            t_ref=t_ref, lmin=lmin, lmax=lmax)
                 data = np.array(data)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = data * 1e3
@@ -2556,17 +2559,16 @@ class Network():
             else:
                 number -= 1
                 
-        for i, sigma in enumerate([1e-18, 1e-19, 1e-20]):
-            noise = np.random.normal(0, sigma, len(T))
-            noise2 = np.random.normal(0, sigma, len(T)*2)
-            noise = noise + noise2[int(len(noise2)/2):]
-            fn, noisy = harmony.time2freq(delta_t, noise)
-            noise_level = np.mean(noisy) * np.ones(len(f))
-            if i == 0:
-                plt.plot(f*86400*365, noise_level, '--', label='noise levels',
-                         color='k')
-            else:
-                plt.plot(f*86400*365, noise_level, '--', color='k')
+        noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+        noise = noise * np.sqrt(2)
+        # plt.plot(f[1:]*86400*365, noise[0, :], '--', color='black',
+        #          label='noise levels')
+        # plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
+        # plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
+        plt.plot(np.arange(1, 183), noise[0, :], '--', color='black',
+                 label='noise levels')
+        plt.plot(np.arange(1, 183), noise[1, :], '--', color='black')
+        plt.plot(np.arange(1, 183), noise[2, :], '--', color='black')
         
         plt.xscale('log')
         plt.yscale('log')
@@ -2574,7 +2576,7 @@ class Network():
         plt.ylabel(unit_dict[unitTo])
         plt.grid()
         # plt.legend()
-        plt.legend(loc='lower left')
+        plt.legend(loc='lower right')
         plt.tight_layout()
         
         if save:
@@ -2584,7 +2586,8 @@ class Network():
         
         return fig
 
-    def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, save=False):
+    def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, scenario,
+                            monthly=False, save=False):
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
@@ -2603,8 +2606,23 @@ class Network():
         t, data0 = clo0.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
         t, data1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
         data = (np.array(data1) - np.array(data0)) * 1e3
-        sigma = (1e-19 * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
+        
+        # Sigma clocks
+        if scenario == 1:
+            sigma = 1e-18
+        elif scenario == 2:
+            sigma = 1e-19
+        elif scenario == 3:
+            sigma = 1e-20
+        sigma = (sigma * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
                  sh.constant.r3_wgs84.value**2 * 1e3 * np.sqrt(2))  # [mm]
+        if scenario == 1:
+            sigma = sigma + 2 * np.sqrt(2)
+        elif scenario == 2:
+            sigma = sigma + 1 * np.sqrt(2)
+        elif scenario == 3:
+            sigma = sigma + 0.4 * np.sqrt(2)
+        
         # GRACE
         T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
         files = ['/home/schroeder/CLONETS/data/ITSG-Grace2018_n120_2007-'
@@ -2620,6 +2638,18 @@ class Network():
         tm, grace1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
         tm = [x + datetime.timedelta(14) for x in tm]
         grace = 1e3 * (np.array(grace1) - np.array(grace0))
+        
+        # averaging to monthly clock data
+        if monthly:
+            datam = utils.daily2monthly(t, data)
+            if scenario == 1:
+                sigma = sigma - 1 * np.sqrt(2)
+            elif scenario == 2:
+                sigma = sigma - 0.5 * np.sqrt(2)
+            elif scenario == 3:
+                sigma = sigma - 0.2 * np.sqrt(2)
+            t = tm
+            data = datam
                 
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
@@ -2640,11 +2670,15 @@ class Network():
 
         if save:
             savepath = path + '../fig/'
-            savename = (os.path.join(savepath, 'timeseries', esc + '_wsigma_'
-                                     + loc + '.pdf'))
+            if monthly:
+                savename = (os.path.join(savepath, 'timeseries', esc + '_wsigma_'
+                                         + loc + '_monthly.pdf'))
+            else:    
+                savename = (os.path.join(savepath, 'timeseries', esc + '_wsigma_'
+                                         + loc + '.pdf'))
             plt.savefig(savename)
         
-        return fig
+        return fig, t, tm, data, grace, sigma, s_grace
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
                         inp_func, t):
@@ -2655,7 +2689,7 @@ class Network():
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
-        # datamax = 10  # WATCH OUT
+        # datamax = 0.4  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
