@@ -61,15 +61,12 @@ class Clock():
     def __init__(self, location='', lat=0, lon=0, country=None, path=False):
         """Builds an optical clock."""
         
-        if path:
-            self.from_file(path)
-        else:
-            self.location = location
-            self.country = country
-            self.lat = lat
-            self.lon = lon
-            self.links = []
-            self.states = []
+        self.location = location
+        self.country = country
+        self.lat = lat
+        self.lon = lon
+        self.links = []
+        self.states = []
         
     def __repr__(self):
         """To be printed if instance is pwritten."""
@@ -332,14 +329,14 @@ class Clock():
             f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
             f_lm_ref = harmony.shcoeffs_from_netcdf(path + esc_dict[esc]
                                                     + t_ref)
-            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
-            f_lm_ref = harmony.sh2sh(f_lm_ref, unitFrom, unitTo)
-            if lmin:
-                f_lm = f_lm - f_lm.pad(lmin).pad(f_lm.lmax)
-                f_lm_ref = f_lm_ref - f_lm_ref.pad(lmin).pad(f_lm_ref.lmax)
-            if lmax:
-                f_lm = f_lm.pad(lmax).pad(f_lm.lmax)
-                f_lm_ref = f_lm_ref.pad(lmax).pad(f_lm_ref.lmax)
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo, lmax=lmax)
+            f_lm_ref = harmony.sh2sh(f_lm_ref, unitFrom, unitTo, lmax=lmax)
+            # if lmin:
+            #     f_lm = f_lm - f_lm.pad(lmin).pad(f_lm.lmax)
+            #     f_lm_ref = f_lm_ref - f_lm_ref.pad(lmin).pad(f_lm_ref.lmax)
+            # if lmax:
+            #     f_lm = f_lm.pad(lmax).pad(f_lm.lmax)
+            #     f_lm_ref = f_lm_ref.pad(lmax).pad(f_lm_ref.lmax)
             f_lm = f_lm - f_lm_ref
             series.append(f_lm.expand(lat=self.lat, lon=self.lon))
         
@@ -356,7 +353,119 @@ class Clock():
                 noise = [utils.ma(noi, filt) for noi in noise]
             return T_date, series, noise
         
-        return T_date, series
+        return T_date, series    
+    
+    def sh2timeseries_error(self, add, T, esc, unitFrom, unitTo, t_ref=False,
+                            reset=False, error=False, sigma=False, filt=False,
+                            lmin=False, lmax=False):
+        """Expands spherical harmonics at clock location.
+        
+        Takes the spherical harmonics from the data folder at a given time
+        interval, adds a given additional set of sh's, e.g. errors, and expands
+        them at the clock location.
+        
+        :param T: list of dates
+        :type T: str or datetime.date(time)
+        :param esc: earth system component
+        :type esc: str
+        :param unitFrom: unit of the input coefficients
+        :type unitFrom: str
+        :param unitTo: unit of the timeseries
+        :type unitTo: str
+        :param t_ref: reference time for the series
+        :type t_ref: str or datetime.date(time)
+        :param reset: shall the timeseries be calculated again
+        :type reset: boolean, optional
+        :param error: the clock error type: 'white' or 'allan'
+        :type error: str
+        :param sigma: uncertainty of the clock
+        :type sigma: float
+        :param filt: filter width for the data, has to be an odd number
+        :type filt: integer, optional
+        :return T_date: dates of the timeseries
+        :rtype T_date: list of str
+        :return series: timeseries
+        :rtype series: list of floats
+        
+        Possible units:
+            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+                'U' ... geopotential [m^2/s^2]
+                'N' ... geoid height [m]
+            'h' ... elevation [m]
+            'ff' ... fractional frequency [-]
+            'mass' ... dimensionless surface loading coeffs
+                'sd' ... surface density [kg/m^2]
+                'ewh' ... equivalent water height [m]
+            'gravity'... [m/s^2]
+            
+        Possible earth system components:
+            'I' ... Ice
+            'H' ... Hydrology
+            'A' ... Atmosphere
+            'GIA'.. Glacial Isostatic Adjustment
+        """
+        
+        esc_dict = {'I': 'oggm_',
+                    'I_scandinavia': 'oggm_',
+                    'H': 'clm_tws_',
+                    'A': 'coeffs_',
+                    'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
+        
+        # TODO: Check whether the timeseries is already there
+        
+        path = cfg.PATHS['data_path'] + esc + '/'
+        # make strings if time is given in datetime objects
+        if not isinstance(t_ref, str):
+            t_ref = datetime.datetime.strftime(t_ref, format='%Y_%m_%d')
+        if not isinstance(T[0], str):
+            T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        # Check whether the data is available
+        if not os.path.exists(path + esc_dict[esc] + t_ref + '.nc'):
+            print(path + esc_dict[esc] + t_ref + '.nc', ' does not exist.')
+            return
+        for t in T:
+            if not os.path.exists(path + esc_dict[esc] + t + '.nc'):
+                print(path + esc_dict[esc] + t + '.nc', ' does not exist.')
+                return
+            
+        series = []
+        series_upper = []
+        series_lower = []
+        for t in T:
+            f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
+            f_lm_ref = harmony.shcoeffs_from_netcdf(path + esc_dict[esc]
+                                                    + t_ref)
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+            f_lm_upper = harmony.sh2sh(f_lm, unitFrom, unitTo) + add
+            f_lm_lower = harmony.sh2sh(f_lm, unitFrom, unitTo) - add
+            f_lm_ref = harmony.sh2sh(f_lm_ref, unitFrom, unitTo)
+            f_lm_ref_upper = harmony.sh2sh(f_lm_ref, unitFrom, unitTo) + add
+            f_lm_ref_lower = harmony.sh2sh(f_lm_ref, unitFrom, unitTo) - add
+            f_lm = f_lm - f_lm_ref
+            f_lm_upper = f_lm_upper - f_lm_ref_upper
+            f_lm_lower = f_lm_lower - f_lm_ref_lower
+            print(f_lm_ref_upper.expand(lat=self.lat, lon=self.lon) -
+                  f_lm_ref_lower.expand(lat=self.lat, lon=self.lon))
+            series.append(f_lm.expand(lat=self.lat, lon=self.lon))
+            series_upper.append(f_lm_upper.expand(lat=self.lat, lon=self.lon))
+            series_lower.append(f_lm_lower.expand(lat=self.lat, lon=self.lon))
+        
+        try:
+            T_date = [datetime.datetime.strptime(t, '%Y_%m_%d') for t in T]
+        except:
+            T_date = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        
+        if filt:
+            series = utils.ma(np.array(series), filt)
+            series_upper = utils.ma(np.array(series_upper), filt)
+            series_lower = utils.ma(np.array(series_lower), filt)
+        # if sigma:
+        #     noise = self.construct_noise(len(series))
+            # if filt:
+            #     noise = [utils.ma(noi, filt) for noi in noise]
+            return T_date, series, series_upper, series_lower#, noise
+        
+        return T_date, series, series_upper, series_lower
      
     def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
                        reset=False, error=False, sigma=False, save=False):
@@ -618,50 +727,6 @@ class Clock():
                     + '_' + self.location + '_spectral.pdf')
             plt.savefig(path)
             #TODO: case for esc is list
-            
-    def to_file(self):
-        """Writes the clock into netcdf files and a json readme."""
-        
-        if self.path is None:
-            print('Warning: Clock ' + self.location +
-                  ' is not part of a network')
-            return
-
-        # the readme data
-        clo = {}
-        clo['location'] = self.location
-        clo['lat'] = self.lat
-        clo['lon'] = self.lon
-        clo['links'] = [c.location for c in self.links]
-        clo['states'] = [s for s in self.states]
-        clo['country'] = self.country
-        with open(self.path + 'readme.json', 'w+') as f:
-            json.dump(clo, f)
-        
-        # loop for the different sources
-        effect_names = []
-        for effect_name in ('I', 'H', 'A', 'O', 'GIA', 'S'):
-            if hasattr(self, effect_name):
-                effect_names.append(effect_name)
-        
-        # dict for the different signal descriptions and units
-        signal = {'N': ('Geoid height', 'm'),
-                  'h': ('Elevation', 'm'),
-                  'g': ('gravitational acceleration', 'm/s^2'),
-                  'ff': ('Fractional Frequency', '-')}
-        
-        # write the different sources to netcdf
-        for effect_name in effect_names:
-            effect = getattr(self, effect_name)
-            ds = xr.Dataset()
-            ds.attrs['creation_date'] = strftime("%Y-%m-%d %H:%M:%S", gmtime())
-            ds.coords['time'] = ('time', effect['t'])
-            for key, value in effect.items():
-                if not key == 't':
-                    ds[key] = ('time', value)
-                    ds[key].attrs['description'] = signal[key][0]
-                    ds[key].attrs['unit'] = signal[key][1]
-            ds.to_netcdf(self.path + effect_name + '.nc')
     
     def plotCorrelation(self, T, esc, unitFrom, unitTo, save=False,
                         trend=False):
@@ -811,47 +876,6 @@ class Clock():
         
         return fig, grid, distances, EUROPA_corr
         
-    def from_file(self, path):
-        """Called when the clock is initialized from a folder."""
-        
-        with open(path + 'readme.json', 'r') as f:
-            clo = json.load(f)
-        
-        self.location = clo['location']
-        self.country = clo['country']
-        self.lat = clo['lat']
-        self.lon = clo['lon']
-        self.links = clo['links']
-        self.states = clo['states']
-        
-        # loop for the different sources
-        effect_names = []
-        for effect_name in ('I', 'H', 'A', 'O', 'GIA', 'S'):
-            if effect_name + '.nc' in os.listdir(path):
-                effect_names.append(effect_name)
-                
-        for effect_name in effect_names:
-            ds = xr.open_dataset(path + effect_name + '.nc')
-            dct = {}
-            try:
-                dct['t'] = ds['time'].data
-            except:
-                print('Warning: Time not included in ' + effect_name)
-            for var in ds.data_vars:
-                try:
-                    dct[var] = ds[var].data
-                except:
-                    print('Warning: ' + var + ' not included in ' + effect_name)
-            # try:
-            #     dct['h'] = ds['h'].data
-            # except:
-            #     print('Warning: Elevation not included in ' + effect_name)
-            # try:
-            #     dct['N'] = ds['N'].data
-            # except:
-            #     print('Warning: Geoid height not included in ' + effect_name)
-            setattr(self, effect_name, dct)  # equal to: self.effect_name = dct, but effect_name can be a string
-
 class Link():
     """A fibre link between two clocks.
     
@@ -1273,22 +1297,204 @@ class Network():
     :type links: list of Links
     """
     
-    def __init__(self, reset=False):
+    def __init__(self, name, reset=False):
         """Builds an optical clock network."""
         
-        if reset and os.path.isdir(cfg.PATHS['WORKING_DIR'] + 'clocks'):
-            shutil.rmtree(cfg.PATHS['WORKING_DIR'] + 'clocks')
-            self.clocks = []
-            self.links = []
-            if not os.path.exists('clocks'):
-                os.makedirs('clocks')
-        elif not reset and os.path.isdir(cfg.PATHS['WORKING_DIR'] + 'clocks'):
-            self.from_file()
+        self.clocks = []
+        self.links = []
+        if name == 'clonets':
+            braunschweig = Clock('Braunschweig', 52.2903, 10.4547, country='Germany')  # PTB
+            wettzell = Clock('Wettzell', 49.1300, 12.900, country='Germany')  # observatory
+            bonn = Clock('Bonn', 50.7250, 7.1000, country='Germany')  # uni bonn
+            munich = Clock('Munich', 48.1600, 11.5000, country='Germany')  # tu munich
+            potsdam = Clock('Potsdam', 52.3826, 13.0642, country='Germany')  # GFZ
+            delft = Clock('Delft', 51.9900, 4.4000, country='Netherlands')  # VSL
+            london = Clock('London', 51.4200, 0.3400, country='UK')  # NPL
+            paris = Clock('Paris', 48.8300, 2.2200, country='France')  # OBSPARIS
+            strasbourg = Clock('Strasbourg', 48.5841, 7.7633, country='France')  # uni strasbourg
+            bern = Clock('Bern', 46.9300, 7.4500, country='Switzerland')  # METAS
+            torino = Clock('Torino', 45.0000, 7.6300, country='Italy')  # INRIM
+            vienna = Clock('Vienna', 48.2000, 16.3700, country='Austria')  # BEV
+            ljubljana = Clock('Ljubljana', 46.0473, 14.4932, country='Slovenia')  # SIQ
+            prague = Clock('Prague', 50.0700, 14.5300, country='Czech Republic')  # CMI
+            torun = Clock('Torun', 53.0000, 18.6038, country='Poland')  # AMO (?)
+            posen = Clock('Posen', 52.4071, 16.9538, country='Poland')  # PSNC
+            warsaw = Clock('Warsaw', 52.2000, 21.0000, country='Poland')  # GUM
+            helsinki = Clock('Helsinki', 60.1800, 24.8257, country='Finland')  # VTT MIKES
+            gothenburg = Clock('Gothenburg', 57.6858, 11.9556, country='Sweden')  # RISE
+            
+            self.add_clock(braunschweig)
+            self.add_clock(wettzell)
+            self.add_clock(bonn)
+            self.add_clock(munich)
+            self.add_clock(potsdam)
+            self.add_clock(delft)
+            self.add_clock(london)
+            self.add_clock(paris)
+            self.add_clock(strasbourg)
+            self.add_clock(bern)
+            self.add_clock(torino)
+            self.add_clock(vienna)
+            self.add_clock(ljubljana)
+            self.add_clock(prague)
+            self.add_clock(torun)
+            self.add_clock(warsaw)
+            self.add_clock(posen)
+            self.add_clock(helsinki)
+            self.add_clock(gothenburg)
+            
+            # existing
+            self.add_link(braunschweig, strasbourg, 0)
+            self.add_link(braunschweig, munich, 0)
+            self.add_link(paris, strasbourg, 0)
+            self.add_link(paris, london, 0)
+            self.add_link(warsaw, posen, 0)
+            self.add_link(torun, posen, 0)
+            # imaginable
+            self.add_link(bonn, braunschweig, 9)
+            self.add_link(bonn, strasbourg, 9)
+            self.add_link(bonn, delft, 9)
+            self.add_link(wettzell, munich, 9)
+            self.add_link(wettzell, prague, 9)
+            self.add_link(posen, prague, 9)
+            # self.add_link(braunschweig, prague, 9)
+            # extension 1
+            self.add_link(gothenburg, helsinki, 1)
+            self.add_link(prague, vienna, 1)
+            self.add_link(munich, strasbourg, 1)
+            self.add_link(braunschweig, potsdam, 1)
+            self.add_link(braunschweig, delft, 1)
+            self.add_link(braunschweig, gothenburg, 1)
+            self.add_link(potsdam, posen, 1)
+            self.add_link(strasbourg, bern, 1)
+            self.add_link(bern, torino, 1)
+            self.add_link(paris, torino, 1)
+            self.add_link(munich, vienna, 1)
+            self.add_link(vienna, warsaw, 1)
+            # extension 2
+            self.add_link(london, delft, 2)
+            self.add_link(torino, ljubljana, 2)
+            self.add_link(ljubljana, vienna, 2)
+            self.add_link(warsaw, helsinki, 2)
+            # reference Braunschweig
+            self.add_link(braunschweig, bern, 5)
+            self.add_link(braunschweig, helsinki, 5)
+            self.add_link(braunschweig, london, 5)
+        elif name == 'euref':
+            filename = '/home/schroeder/CLONETS/data/EUREF_Permanent_GNSS_Network.csv'
+            stations = utils.load_euref(filename)
+            
+            north = 65
+            south = 40
+            west = -10
+            east = 30
+            for station in stations:
+                name = station[0]
+                lat = station[1]
+                lon = station[2]
+                if lon > 180:
+                    lon = lon - 360
+                if lon > west and lon < east and lat < north and lat > south:
+                    self.add_clock(Clock(name, lat, lon))
+            
+            braunschweig = Clock('Braunschweig', 52.2903, 10.4547, country='Germany')  # PTB
+            wettzell = Clock('Wettzell', 49.1300, 12.900, country='Germany')  # observatory
+            bonn = Clock('Bonn', 50.7250, 7.1000, country='Germany')  # uni bonn
+            munich = Clock('Munich', 48.1600, 11.5000, country='Germany')  # tu munich
+            potsdam = Clock('Potsdam', 52.3826, 13.0642, country='Germany')  # GFZ
+            delft = Clock('Delft', 51.9900, 4.4000, country='Netherlands')  # VSL
+            london = Clock('London', 51.4200, 0.3400, country='UK')  # NPL
+            paris = Clock('Paris', 48.8300, 2.2200, country='France')  # OBSPARIS
+            strasbourg = Clock('Strasbourg', 48.5841, 7.7633, country='France')  # uni strasbourg
+            bern = Clock('Bern', 46.9300, 7.4500, country='Switzerland')  # METAS
+            torino = Clock('Torino', 45.0000, 7.6300, country='Italy')  # INRIM
+            vienna = Clock('Vienna', 48.2000, 16.3700, country='Austria')  # BEV
+            ljubljana = Clock('Ljubljana', 46.0473, 14.4932, country='Slovenia')  # SIQ
+            prague = Clock('Prague', 50.0700, 14.5300, country='Czech Republic')  # CMI
+            torun = Clock('Torun', 53.0000, 18.6038, country='Poland')  # AMO (?)
+            posen = Clock('Posen', 52.4071, 16.9538, country='Poland')  # PSNC
+            warsaw = Clock('Warsaw', 52.2000, 21.0000, country='Poland')  # GUM
+            helsinki = Clock('Helsinki', 60.1800, 24.8257, country='Finland')  # VTT MIKES
+            gothenburg = Clock('Gothenburg', 57.6858, 11.9556, country='Sweden')  # RISE
+            
+            self.add_clock(braunschweig)
+            self.add_clock(wettzell)
+            self.add_clock(bonn)
+            self.add_clock(munich)
+            self.add_clock(potsdam)
+            self.add_clock(delft)
+            self.add_clock(london)
+            self.add_clock(paris)
+            self.add_clock(strasbourg)
+            self.add_clock(bern)
+            self.add_clock(torino)
+            self.add_clock(vienna)
+            self.add_clock(ljubljana)
+            self.add_clock(prague)
+            self.add_clock(torun)
+            self.add_clock(warsaw)
+            self.add_clock(posen)
+            self.add_clock(helsinki)
+            self.add_clock(gothenburg)
+        elif name == 'eike_sg':
+            filename = '/home/schroeder/CLONETS/data/NGL_gnss_Stations.txt'
+            stations = utils.load_ngl(filename)
+            
+            north = 65
+            south = 40
+            west = -10
+            east = 30
+            for station in stations:
+                name = station[0]
+                lat = station[1]
+                lon = station[2]
+                if lon > 180:
+                    lon = lon - 360
+                if lon > west and lon < east and lat < north and lat > south:
+                    self.add_clock(Clock(name, lat, lon))
+            
+            braunschweig = Clock('Braunschweig', 52.2903, 10.4547, country='Germany')  # PTB
+            wettzell = Clock('Wettzell', 49.1300, 12.900, country='Germany')  # observatory
+            bonn = Clock('Bonn', 50.7250, 7.1000, country='Germany')  # uni bonn
+            munich = Clock('Munich', 48.1600, 11.5000, country='Germany')  # tu munich
+            potsdam = Clock('Potsdam', 52.3826, 13.0642, country='Germany')  # GFZ
+            delft = Clock('Delft', 51.9900, 4.4000, country='Netherlands')  # VSL
+            london = Clock('London', 51.4200, 0.3400, country='UK')  # NPL
+            paris = Clock('Paris', 48.8300, 2.2200, country='France')  # OBSPARIS
+            strasbourg = Clock('Strasbourg', 48.5841, 7.7633, country='France')  # uni strasbourg
+            bern = Clock('Bern', 46.9300, 7.4500, country='Switzerland')  # METAS
+            torino = Clock('Torino', 45.0000, 7.6300, country='Italy')  # INRIM
+            vienna = Clock('Vienna', 48.2000, 16.3700, country='Austria')  # BEV
+            ljubljana = Clock('Ljubljana', 46.0473, 14.4932, country='Slovenia')  # SIQ
+            prague = Clock('Prague', 50.0700, 14.5300, country='Czech Republic')  # CMI
+            torun = Clock('Torun', 53.0000, 18.6038, country='Poland')  # AMO (?)
+            posen = Clock('Posen', 52.4071, 16.9538, country='Poland')  # PSNC
+            warsaw = Clock('Warsaw', 52.2000, 21.0000, country='Poland')  # GUM
+            helsinki = Clock('Helsinki', 60.1800, 24.8257, country='Finland')  # VTT MIKES
+            gothenburg = Clock('Gothenburg', 57.6858, 11.9556, country='Sweden')  # RISE
+            
+            self.add_clock(braunschweig)
+            self.add_clock(wettzell)
+            self.add_clock(bonn)
+            self.add_clock(munich)
+            self.add_clock(potsdam)
+            self.add_clock(delft)
+            self.add_clock(london)
+            self.add_clock(paris)
+            self.add_clock(strasbourg)
+            self.add_clock(bern)
+            self.add_clock(torino)
+            self.add_clock(vienna)
+            self.add_clock(ljubljana)
+            self.add_clock(prague)
+            self.add_clock(torun)
+            self.add_clock(warsaw)
+            self.add_clock(posen)
+            self.add_clock(helsinki)
+            self.add_clock(gothenburg)
         else:
-            self.clocks = []
-            self.links = []
-            os.makedirs(cfg.PATHS['WORKING_DIR'] + 'clocks')
-                    
+            print('Network name not found! Network empty!')
+            
     def __repr__(self):
         """To be printed if instance is written."""
         
@@ -1297,26 +1503,6 @@ class Network():
             summary += c.location + '\n'
         return summary + '\n'
             
-    def from_file(self):
-        """Initializes an already built optical clock network."""
-        
-        self.clocks = []
-        self.links = []
-        clos = next(os.walk(cfg.PATHS['WORKING_DIR'] + 'clocks'))[1]
-        for clo in clos:
-            clock = Clock(path=cfg.PATHS['WORKING_DIR'] + 'clocks/' + clo + '/')
-            self.add_clock(clock)  
-        
-        already_linked = []
-        for clo in self.clocks:  # clocks in network
-            for s, li in zip(clo.states, clo.links):  # string links in particular clock
-                for c in self.search_clock('location', li):  # clock with this string
-                    if not c.location in already_linked:
-                        self.add_link(c, clo, state=s)                    
-            already_linked.append(clo.location)
-            # remove the links which are stored as strings from json loading
-            clo.links[:] = [li for li in clo.links if not isinstance(li, str)]           
-        
     def search_clock(self, attr, value):
         """Search for a clock in the network.
         
@@ -1396,10 +1582,6 @@ class Network():
             self.clocks.append(clo)
         else:
             print('Warning: Clock ' + clo + ' is already in the network!')
-            
-        clo.path = 'clocks/' + clo.location + '/'
-        if not os.path.exists(clo.path):
-            os.mkdir(clo.path)
         
     def add_link(self, a, b, state=9):
         """Build a fibre link between two clocks a and b."""
@@ -1556,13 +1738,13 @@ class Network():
                 if s0:
                     fig.plot(x, y, pen="1p,red")
                 else:
-                    fig.plot(x, y, pen="1p,red", label='Existing')
+                    fig.plot(x, y, pen="1p,red", label='"Existing links"')
                     s0 = True
             elif l.state == 1:
                 if s1:
                     fig.plot(x, y, pen="1p,blue,-")
                 else:
-                    fig.plot(x, y, pen="1p,blue,-")#, label='"Phase 1"')
+                    fig.plot(x, y, pen="1p,blue,-", label='"Possible links"')
                     s1 = True
             elif l.state == 2:
                 if s2:
@@ -1594,7 +1776,7 @@ class Network():
                 fig.text(x=clo.lon+0.3, y=clo.lat, text=clo.location, region=region,
                          projection=projection, font='12p,Helvetica,black',
                          justify='LT')
-        fig.legend(position='g2/60', box='+gwhite+p1p')
+        fig.legend(position='g2/59', box='+gwhite+p1p')
         
         if save:
             fig.savefig('/home/schroeder/CLONETS/fig/clonets_gmt.pdf')
@@ -1781,7 +1963,7 @@ class Network():
             
         if unitTo in('N', 'h', 'GRACE'):
             points = points * 1e3
-        datamax = max(abs(points))
+        datamax = 4 # max(abs(points))
         print(points)
         
         data = {'data': points, 'lat': self.lats(), 'lon': self.lons()}
@@ -1937,9 +2119,10 @@ class Network():
                                                   EUROPA_trend))
                 elif trend == 'annual' or trend == 'semiannual':
                     if trend == 'annual':
-                        model, A = utils.annual_trend(T_frac, EUROPA[:, i, j],
+                        model, A = utils.annual_trend(np.array([utils.datetime2frac(datetime.datetime.strptime(t, '%Y_%m_%d')) for t in T]), EUROPA[:, i, j],
                                                       semi=False)
                     else:
+                        # model, A = utils.annual_trend(np.array([utils.datetime2frac(datetime.datetime.strptime(t, '%Y_%m_%d')) for t in T]), EUROPA[:, i, j])
                         model, A = utils.annual_trend(T_frac, EUROPA[:, i, j])
                     EUROPA_trend = A.dot(model)
                     EUROPA_rms[i, j] = (utils.rms(EUROPA[:, i, j],
@@ -2472,7 +2655,7 @@ class Network():
         # plt.ylim([-0.42, 0.34])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
-        plt.title(esc)
+        # plt.title(esc)
         plt.grid()
         plt.legend(loc=1)#bbox_to_anchor=(1., 1.))
         plt.tight_layout()
@@ -2555,7 +2738,10 @@ class Network():
                 f, freq = harmony.time2freq(delta_t, data)
                 if fmax:
                     f, freq = (f[:fmax], freq[:fmax])
-                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=clo.location)
+                if esc == 'I':
+                    plt.plot(f[3:]*86400*365, freq[3:], '.-', label=clo.location)
+                else:
+                    plt.plot(f[1:]*86400*365, freq[1:], '.-', label=clo.location)
             else:
                 number -= 1
                 
@@ -2586,8 +2772,8 @@ class Network():
         
         return fig
 
-    def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, scenario,
-                            monthly=False, save=False):
+    def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, monthly=False,
+                            save=False):
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
@@ -2608,58 +2794,93 @@ class Network():
         data = (np.array(data1) - np.array(data0)) * 1e3
         
         # Sigma clocks
-        if scenario == 1:
-            sigma = 1e-18
-        elif scenario == 2:
-            sigma = 1e-19
-        elif scenario == 3:
-            sigma = 1e-20
-        sigma = (sigma * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
+        sigma1 = 1e-18
+        sigma2 = 1e-19
+        sigma3 = 1e-20
+        sigma1 = (sigma1 * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
                  sh.constant.r3_wgs84.value**2 * 1e3 * np.sqrt(2))  # [mm]
-        if scenario == 1:
-            sigma = sigma + 2 * np.sqrt(2)
-        elif scenario == 2:
-            sigma = sigma + 1 * np.sqrt(2)
-        elif scenario == 3:
-            sigma = sigma + 0.4 * np.sqrt(2)
+        sigma2 = (sigma2 * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
+                 sh.constant.r3_wgs84.value**2 * 1e3 * np.sqrt(2))  # [mm]
+        sigma3 = (sigma3 * scipy.constants.c**2 / sh.constant.gm_wgs84.value *
+                 sh.constant.r3_wgs84.value**2 * 1e3 * np.sqrt(2))  # [mm]
+        sigma1 = sigma1 + 2 * np.sqrt(2)
+        sigma2 = sigma2 + 1 * np.sqrt(2)
+        sigma3 = sigma3 + 0.4 * np.sqrt(2)
         
         # GRACE
         T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
         files = ['/home/schroeder/CLONETS/data/ITSG-Grace2018_n120_2007-'
                   + f'{d:02}' + 'sigma.nc' for d in range(1, 13)]
-        sigma_grace = [harmony.sh2sh(harmony.shcoeffs_from_netcdf(f), 'pot', 'GRACE')
-                        for f in files]
-        s_grace = 1e3 * np.array(
-            [np.sqrt(s.pad(120).expand(lat=clo0.lat, lon=clo0.lon)**2
-              + s.pad(120).expand(lat=clo1.lat, lon=clo1.lon)**2)
-              for s in sigma_grace])
+        sigma_grace = [harmony.sh2sh(harmony.shcoeffs_from_netcdf(f), 'pot', 'pot')
+                       for f in files]  # 12 sh sets with the errors ...
+        # Error Propagation # TODO: this only works for 'pot' to 'N', so dont use this function with other units...
+        sigma_xx1 = np.array([harmony.Sigma_xx_2points_from_formal(
+            x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=100)   
+            for x in sigma_grace])  # [m]
+        sigma_xx2 = np.array([harmony.Sigma_xx_2points_from_formal(
+            x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=80)   
+            for x in sigma_grace])  # [m]
+        sigma_xx3 = np.array([harmony.Sigma_xx_2points_from_formal(
+            x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=60)   
+            for x in sigma_grace])  # [m]
+        s_grace1 = 1e3 * sigma_xx1  # [mm]
+        s_grace2 = 1e3 * sigma_xx2  # [mm]
+        s_grace3 = 1e3 * sigma_xx3  # [mm]
         
-        tm, grace0 = clo0.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
-        tm, grace1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref)
+        print(clo1.location, np.mean(s_grace1))
+        print(clo1.location, np.mean(s_grace2))
+        print(clo1.location, np.mean(s_grace3))
+        # np.array(
+        #     [np.sqrt(s.pad(120).expand(lat=clo0.lat, lon=clo0.lon)**2
+        #       + s.pad(120).expand(lat=clo1.lat, lon=clo1.lon)**2)
+        #       for s in sigma_grace]) * 1.1 / np.sqrt(2)  # ... expanded to the 2 clock locations
+        
+        # tm, grace0, grace0_upper, grace0_lower = clo0.sh2timeseries_error(
+        #     sigma_grace[0], T, esc, unitFrom, 'GRACE',)  # simulated GRACE time series
+        # tm, grace1, grace1_upper, grace1_lower = clo1.sh2timeseries_error(
+        #     sigma_grace[0], T, esc, unitFrom, 'GRACE', t_ref=t_ref)  # simulated GRACE time series
+        tm, grace0 = clo0.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref, lmax=80)
+        tm, grace1 = clo1.sh2timeseries(T, esc, unitFrom, unitTo, t_ref=t_ref, lmax=80)
+        grace = 1e3 * (np.array(grace1) - np.array(grace0))  # difference between the two
         tm = [x + datetime.timedelta(14) for x in tm]
-        grace = 1e3 * (np.array(grace1) - np.array(grace0))
         
         # averaging to monthly clock data
         if monthly:
             datam = utils.daily2monthly(t, data)
-            if scenario == 1:
-                sigma = sigma - 1 * np.sqrt(2)
-            elif scenario == 2:
-                sigma = sigma - 0.5 * np.sqrt(2)
-            elif scenario == 3:
-                sigma = sigma - 0.2 * np.sqrt(2)
+            sigma1 = sigma1 - 2 * np.sqrt(2) + 2 * np.sqrt(2) / np.sqrt(4)
+            sigma2 = sigma2 - 1 * np.sqrt(2) + 1 * np.sqrt(2) / np.sqrt(4)
+            sigma3 = sigma3 - 0.4 * np.sqrt(2) + 0.4 * np.sqrt(2) / np.sqrt(4)
             t = tm
             data = datam
                 
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
         
-        plt.plot(t, data, label='clocks')
-        plt.plot(tm, grace, label='GRACE')
-        plt.fill_between(t, data+sigma, data-sigma, alpha=0.3, color='tab:blue')
-        plt.fill_between(tm, grace+s_grace, grace-s_grace, alpha=0.3, color='tab:orange')
+        plt.plot(tm, grace, label='GRACE', color='tab:orange')
+        # plt.plot(t, data+sigma1, '--', color='tab:blue', label='network error', linewidth=0.7)
+        # plt.plot(t, data+sigma2, '--', color='tab:blue', label='network error', linewidth=0.7)
+        # plt.plot(t, data+sigma3, '--', color='tab:blue', linewidth=0.7)
+        # plt.plot(t, data-sigma1, '--', color='tab:blue', linewidth=0.7)
+        # plt.plot(t, data-sigma2, '--', color='tab:blue', linewidth=0.7)
+        # plt.plot(t, data-sigma3, '--', color='tab:blue', linewidth=0.7)
+        plt.plot(t, data, label='Network', color='tab:blue')
+        plt.fill_between(t, data+sigma1, data-sigma1, alpha=0.1, color='tab:blue')
+        plt.fill_between(t, data+sigma2, data-sigma2, alpha=0.2, color='tab:blue')
+        plt.fill_between(t, data+sigma3, data-sigma3, alpha=0.3, color='tab:blue',
+                          label='Network error')
+        plt.plot(tm, grace+s_grace1,  '--', color='tab:orange', label='GRACE error', linewidth=0.7)
+        plt.plot(tm, grace+s_grace2,  '--', color='tab:orange', linewidth=0.7)
+        plt.plot(tm, grace+s_grace3,  '--', color='tab:orange', linewidth=0.7)
+        plt.plot(tm, grace-s_grace1,  '--', color='tab:orange', linewidth=0.7)
+        plt.plot(tm, grace-s_grace2,  '--', color='tab:orange', linewidth=0.7)
+        plt.plot(tm, grace-s_grace3,  '--', color='tab:orange', linewidth=0.7)
+        # plt.fill_between(tm, grace+s_grace1, grace-s_grace1, alpha=0.1, color='tab:orange')
+        # plt.fill_between(tm, grace+s_grace2, grace-s_grace2, alpha=0.2, color='tab:orange')
+        # plt.fill_between(tm, grace+s_grace3, grace-s_grace3, alpha=0.3, color='tab:orange',
+        #                   label='GRACE error')
        
-        plt.ylim([-13, 8.5])
+        plt.ylim([-10, 10])
+        plt.xlim([t[0] + datetime.timedelta(-35), t[-1] + datetime.timedelta(35)])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
         plt.grid()
@@ -2678,7 +2899,7 @@ class Network():
                                          + loc + '.pdf'))
             plt.savefig(savename)
         
-        return fig, t, tm, data, grace, sigma, s_grace
+        return fig, t, tm, data, grace, sigma1, s_grace1
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
                         inp_func, t):
@@ -2689,7 +2910,7 @@ class Network():
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
-        # datamax = 0.4  # WATCH OUT
+        datamax = 4  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem

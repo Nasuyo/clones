@@ -21,7 +21,7 @@ from clones import cfg
 from clones.DDKfilter import DDKfilter
 
 # -----------------------------------------------------------------------------
-def sh2sh(f_lm, From, To):
+def sh2sh(f_lm, From, To, lmax=False):
     """Function to change unit of coefficients.
     
     Converter for spherical harmonic coefficients' form and unit.
@@ -51,7 +51,9 @@ def sh2sh(f_lm, From, To):
     """
     
     # np.random.seed(7)
-    
+    if lmax:
+        f_lm = f_lm.pad(lmax)
+        
     if From == To:
         # print('Well, that was a hard one!')
         return f_lm
@@ -69,7 +71,7 @@ def sh2sh(f_lm, From, To):
     with open(cfg.PATHS['lln_path'] + '/lln.json') as f:
         lln = np.array(json.load(f))
     lln_k1 = lln[0:lmax+1,3] + 1
-    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential --> relic from a wrong belief, Voigt et al (2016) were kind of right...
+    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential --> relic from a wrong belief that Voigt et al (2016) were kind of right...
     lln_h = lln[0:lmax+1,1]
     
     if From in('pot', 'U', 'N'): 
@@ -95,7 +97,8 @@ def sh2sh(f_lm, From, To):
             elif To == 'N':
                 f_lm = f_lm * R
             elif To == 'GRACE':
-                f_lm = ddk(f_lm.pad(120) * R, 2)
+                # f_lm = ddk(f_lm.pad(100) * R, 3)
+                f_lm = f_lm.pad(66) * R
                 # filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
                 # sigma = shcoeffs_from_netcdf(filename)
                 # sigma = sh2sh(sigma, 'pot', 'N')
@@ -246,6 +249,65 @@ def sh2sh(f_lm, From, To):
         print('Choose a proper input unit!')
         return f_lm
     
+def Sigma_xx_2points_from_formal(sigma, lon1, lat1, lon2, lat2, lmax=False, gaussian=False):
+    """Computes 2-point Covariance matrix from GRACE formal errors."""
+    
+    if lmax:
+        sigma = sigma.pad(lmax)
+    row = np.append(np.arange(sigma.lmax), sigma.lmax)
+    colat1 = 90 - lat1  # [°]
+    colat2 = 90 - lat2  # [°]
+    # Earth radius
+    R = sh.constant.r3_wgs84.value  # [m]
+    # Legendre functions
+    leg1 = sh.legendre.legendre(sigma.lmax, np.cos(colat1*np.pi/180))
+    leg2 = sh.legendre.legendre(sigma.lmax, np.cos(colat2*np.pi/180))
+    # sin and cos of m*lambda
+    sin1 = np.tile(np.sin(row*lon1*np.pi/180), (sigma.lmax+1, 1))
+    cos1 = np.tile(np.cos(row*lon1*np.pi/180), (sigma.lmax+1, 1))
+    sin2 = np.tile(np.sin(row*lon2*np.pi/180), (sigma.lmax+1, 1))
+    cos2 = np.tile(np.cos(row*lon2*np.pi/180), (sigma.lmax+1, 1))
+    # Gaussian weights
+    if gaussian:
+        W = np.transpose(np.tile(np.array(
+            [w for w in W_l(sigma.lmax, gaussian)]), (sigma.lmax+1, 1)))
+    else:
+        W = np.ones((sigma.lmax+1, sigma.lmax+1))
+    # Jacobian F
+    ul = R * leg1 * W * sin1  # upper left
+    ur = R * leg1 * W * cos1  # upper right
+    ll = R * leg2 * W * sin2  # lower left
+    lr = R * leg2 * W * cos2  # lower right
+    # Sigma_ll
+    sigma_s2 = sigma.coeffs[1, :, :]**2  # upper left
+    sigma_c2 = sigma.coeffs[0, :, :]**2  # lower right
+    # Sigma_xx
+    Sigma_xx = np.zeros((2, 2))
+    for i in range(sigma.lmax+1):
+        for j in range(sigma.lmax+1):
+            F_ij = np.array([[ul[i, j], ur[i, j]], [ll[i, j], lr[i, j]]])
+            Sigma_ll_ij = np.array([[sigma_s2[i, j], 0], [0, sigma_c2[i, j]]])
+            Sigma_xx_ij = np.matmul(np.matmul(F_ij, Sigma_ll_ij), F_ij.transpose())
+            # if np.any(np.isnan(np.sqrt(Sigma_xx_ij))):
+            #     print(i, j)
+            Sigma_xx = Sigma_xx + Sigma_xx_ij
+            # if i == 2 and j == 2:
+                # print(F_ij)
+                # print(Sigma_ll_ij)
+                # print(Sigma_xx_ij)
+    # Sigma_xx = np.abs(Sigma_xx)
+    # print(Sigma_xx)
+    # print('sigma_N0: ', np.sqrt(Sigma_xx[0, 0]), ' [m]')
+    # print('sigma_N1: ', np.sqrt(Sigma_xx[1, 1]), ' [m]')
+    # alright, first step done! now: sigma_deltaN^2
+    F2 = np.array([-1, 1])
+    sigma_deltaN2 = np.matmul(np.matmul(F2, Sigma_xx), F2.transpose())
+    sigma_deltaN = np.sqrt(sigma_deltaN2)
+    # print("sigma_deltaN^2: ", sigma_deltaN2)
+    # print("sigma_deltaN: ", sigma_deltaN, ' [m]')
+    
+    return sigma_deltaN
+
 def shcoeffs2netcdf(filename, coeffs, unit='', description=''):
     """Store a pyshtools.SHCoeffs instance into a netcdf file.
     
@@ -395,13 +457,38 @@ def read_SHCoeffs(path, headerlines, k=True, lastline=False):#D=False):
 def disc_autocovariance(x):
     """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'."""
     n = len(x)
-    m = int(n/10)
+    m = n# int(n/10)
     C = np.zeros(m+1)
     x = x - np.mean(x)
     for k in range(m+1):
         C[k] = x[:n-k].dot(x[k:n]) / (n-k-1)
     
     return C
+
+# TODO:
+# def autocovariance_fct2matrix(C):
+#     """Returns the corresponding autocovariance matrix to an input function."""
+#     n = len(C)
+#     m = int(n/10)
+#     K = C / C[0]  # Covariance to Correlation function
+#     Q = np.zeros((m, m))
+#     for i in range(m):
+#         for j in range(i):
+#             Q[i, ]
+    
+def autocovariance_fct2neff(C, m=False):
+    """Returns effective measurement number from autocovariance function."""
+    n = len(C)
+    if m == False:
+        m = int(n/10)
+    K = C / C[0]  # Covariance to Correlation function
+    temp = 0
+    for k in range(1, m):
+        temp += (n-k) / n * K[k]
+    neff = n / (1 + 2 * temp)
+    print(temp)
+
+    return neff
 
 def amplitude_spectrum(C, dt):
     """Amplitude spectrum = Scaled fourier transform of the discrete
@@ -480,6 +567,48 @@ def sh_vec2mat(v, N):
         for m in range(n+1):
             NM[n][m] = v[sh_nm2i(n, m, N)]
     return NM
+
+def W_l(N, r):
+    '''A generator for W from Wahr et al. (1998).'''
+    
+    R = sh.constant.r3_wgs84.value / 1000  # [km]
+    b = np.log(2) / (1-np.cos(r/R))
+    l = 0
+    while l < N+1:
+        if l == 0:
+            W = 1 #/ 2 / np.pi
+        elif l == 1:
+            W_1 = W
+            W = W * ((1+np.e**(-2*b))/(1-np.e**(-2*b)) - 1/b)
+        else:
+            W, W_1 = W * (-(2*(l-1) + 1)/b) + W_1, W
+        l += 1
+        yield W
+
+def gauss_filter(f_lm, r=350):
+    """Gaussian filter for spherical harmonic coefficients.
+    
+    A simple filter after Wahr et al. (1998).
+    
+    :type f_lm: pyshtools.SHCoeffs
+    :param f_lm: The SHCoeffs, size [2, N+1, N+1]
+    :type r: float, optional
+    :param r: Filter radius in km
+    :rtype: pyshtools.SHCoeffs
+    :rparam: The filtered SHCoeffs, size [2, N+1, N+1]
+    """
+    
+        # das hier macht zwar keinen generator, aber ist iwie falsch...
+        # W = np.zeros(N)
+        # W[0] = 1 / 2 / np.pi
+        # W[1] = W[0] * ((1+np.e**(-2*b))/(1-np.e**(-2*b)) - 1/b)
+        # for l in range(2, N):
+        #     W[l] =  W[l-1] * (-(2*l + 1)/b) + W[l-2]
+        # return W        
+    
+    W = np.array([w for w in W_l(f_lm.lmax, r)])
+    f_lm = f_lm.coeffs * W.reshape(1, len(W), 1)
+    return sh.SHCoeffs.from_array(f_lm)
 
 def ddk(coeffs, x):
     """Function for an easier call of the right filter."""
