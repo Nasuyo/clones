@@ -15,6 +15,7 @@ import pandas as pd
 from numpy import sqrt, mean, square
 import xarray as xr
 import json
+import geojson
 import time
 import scipy
 from clones import cfg
@@ -58,6 +59,19 @@ def annual_trend(t, data, semi=True):
     x = np.linalg.solve(Ni, n)  # [y-intercept, slope (per yr), cos and sin parameters]
     
     return x, np.transpose(At)    
+
+def C_from_data(Y):
+    """Computes Covariance Matrix from data matrix.
+    
+    :param Y: Data matrix with [location x time]
+    :type Y: 2d numpy array of floats
+    :rparam C: Covariance matrix of the data
+    :rtype: 2d numpy array of floats
+    """
+    
+    N_P = np.shape(Y)[1]  # number of locations
+    C = Y.T @ Y / N_P
+    return C
 
 def rms(x, y=None):
     """Computes the root mean square.
@@ -203,6 +217,19 @@ def load_euref(filename):
     names = list(df['Name'])
     lats = list(df['Latitude'])
     lons = list(df['Longitude'])
+    stations = list([[names[i], lats[i], lons[i]] for i in range(len(names))])
+    
+    return stations
+
+def load_psmsl(filename):
+    """Loads in the names and locations of PSMSL tide gauges."""
+    
+    with open(filename) as f:
+        gj = geojson.load(f)
+    features = gj['features']
+    names = [f.properties['name'] for f in features]
+    lons = [f.geometry.coordinates[0] for f in features]
+    lats = [f.geometry.coordinates[1] for f in features]
     stations = list([[names[i], lats[i], lons[i]] for i in range(len(names))])
     
     return stations

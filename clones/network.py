@@ -8,6 +8,7 @@ Created on Fri Nov  8 10:28:55 2019
 
 # Imports ---------------------------------------------------------------------
 from clones import harmony, cfg, utils
+import time
 from time import gmtime, strftime
 import datetime
 import numpy as np
@@ -21,6 +22,7 @@ import os
 import shutil
 import xarray as xr
 import json
+import geojson
 import contextily as ctx
 import pandas as pd
 import geopandas as gpd
@@ -254,7 +256,7 @@ class Clock():
                     
     def sh2timeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
                       reset=False, error=False, sigma=False, filt=False,
-                      lmin=False, lmax=False):
+                      lmin=False, lmax=False, field=False):
         """Expands spherical harmonics at clock location.
         
         Takes the spherical harmonics from the data folder at a given time
@@ -338,12 +340,39 @@ class Clock():
             #     f_lm = f_lm.pad(lmax).pad(f_lm.lmax)
             #     f_lm_ref = f_lm_ref.pad(lmax).pad(f_lm_ref.lmax)
             f_lm = f_lm - f_lm_ref
-            series.append(f_lm.expand(lat=self.lat, lon=self.lon))
-        
+            if field:
+                t0 = time.time()
+                grid = f_lm.expand()
+                t0 = time.time()
+                lat_limits = [44, 61]
+                lon_limits = [0, 25]
+                lat1 = np.ndarray.flatten(np.array(np.where(grid.lats() < lat_limits[1])))
+                lat2 = np.ndarray.flatten(np.array(np.where(grid.lats() > lat_limits[0])))
+                lat_ind = np.intersect1d(lat1, lat2)
+                lon1 = np.ndarray.flatten(np.array(np.where(grid.lons() < lon_limits[1])))
+                lon2 = np.ndarray.flatten(np.array(np.where(grid.lons() > lon_limits[0])))
+                if lon_limits[0] >= 0:
+                    lon_ind = np.intersect1d(lon2, lon1)
+                else:
+                    lon_ind = np.concatenate((lon2, lon1))
+                true_eu = grid.data[lat_ind][:, lon_ind]
+                true_eu_flat = np.ndarray.flatten(true_eu)
+                lats_eu = grid.lats()[lat_ind]
+                lons_eu = grid.lons()[lon_ind]
+                grid_eu = np.meshgrid(lons_eu, lats_eu)
+                lats_eu = grid_eu[1].flatten()
+                lons_eu = grid_eu[0].flatten()
+                series.append(true_eu_flat)
+            else:
+                series.append(f_lm.expand(lat=self.lat, lon=self.lon))
         try:
             T_date = [datetime.datetime.strptime(t, '%Y_%m_%d') for t in T]
         except:
             T_date = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+            
+        if field:
+            series = np.array(series)
+            return T_date, series, lats_eu, lons_eu
         
         if filt:
             series = utils.ma(np.array(series), filt)
@@ -573,6 +602,10 @@ class Clock():
         plt.legend()
         plt.tight_layout()
         
+        for i, noi in enumerate(noise):
+            np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                    unitTo + '_' + self.location + '_noise' + str(i), data+noi)
+        
         if save:
             path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
                     + '_' + self.location + '.pdf')
@@ -693,6 +726,10 @@ class Clock():
                 plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
                 plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
                 plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
+                
+                np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc +
+                        '_freq_' + self.location, freq[1:])
+                np.save(cfg.PATHS['data_path'] + 'ts_results/x_freq', f[1:]*86400*365)
         else:
             if type(esc) is list:
                 for e in esc:
@@ -1117,6 +1154,13 @@ class Link():
         plt.legend()
         plt.tight_layout()
         
+        np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' + unitTo +
+                '_' + self.b.location + '-' + self.a.location, data_b-data_a)
+        for i, noi in enumerate(noise):
+            np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                    unitTo + '_' + self.b.location + '-' + self.a.location +
+                    '_noise' + str(i), data+noi)
+            
         if save:
             path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
                     + '_' + self.a.location 
@@ -1238,6 +1282,10 @@ class Link():
                 plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
                 plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
                 plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
+                
+                np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc +
+                        '_freq_' + self.b.location + '-' + self.a.location, freq[1:])
+                
         else:
             if type(esc) is list:
                 for e in esc:
@@ -1350,6 +1398,7 @@ class Network():
             self.add_link(paris, london, 0)
             self.add_link(warsaw, posen, 0)
             self.add_link(torun, posen, 0)
+            self.add_link(prague, vienna, 0)
             # imaginable
             self.add_link(bonn, braunschweig, 9)
             self.add_link(bonn, strasbourg, 9)
@@ -1360,7 +1409,6 @@ class Network():
             # self.add_link(braunschweig, prague, 9)
             # extension 1
             self.add_link(gothenburg, helsinki, 1)
-            self.add_link(prague, vienna, 1)
             self.add_link(munich, strasbourg, 1)
             self.add_link(braunschweig, potsdam, 1)
             self.add_link(braunschweig, delft, 1)
@@ -1436,6 +1484,56 @@ class Network():
             self.add_clock(posen)
             self.add_clock(helsinki)
             self.add_clock(gothenburg)
+        elif name == 'psmsl' or name == 'psmsl_only':
+            filename = '/home/schroeder/CLONETS/data/PSMSL_stations.json'
+            stations = utils.load_psmsl(filename)
+            
+            for station in stations:
+                n = station[0]
+                lat = station[1]
+                lon = station[2]
+                self.add_clock(Clock(n, lat, lon))
+            
+            if name == 'psmsl':
+                braunschweig = Clock('Braunschweig', 52.2903, 10.4547, country='Germany')  # PTB
+                wettzell = Clock('Wettzell', 49.1300, 12.900, country='Germany')  # observatory
+                bonn = Clock('Bonn', 50.7250, 7.1000, country='Germany')  # uni bonn
+                munich = Clock('Munich', 48.1600, 11.5000, country='Germany')  # tu munich
+                potsdam = Clock('Potsdam', 52.3826, 13.0642, country='Germany')  # GFZ
+                delft = Clock('Delft', 51.9900, 4.4000, country='Netherlands')  # VSL
+                london = Clock('London', 51.4200, 0.3400, country='UK')  # NPL
+                paris = Clock('Paris', 48.8300, 2.2200, country='France')  # OBSPARIS
+                strasbourg = Clock('Strasbourg', 48.5841, 7.7633, country='France')  # uni strasbourg
+                bern = Clock('Bern', 46.9300, 7.4500, country='Switzerland')  # METAS
+                torino = Clock('Torino', 45.0000, 7.6300, country='Italy')  # INRIM
+                vienna = Clock('Vienna', 48.2000, 16.3700, country='Austria')  # BEV
+                ljubljana = Clock('Ljubljana', 46.0473, 14.4932, country='Slovenia')  # SIQ
+                prague = Clock('Prague', 50.0700, 14.5300, country='Czech Republic')  # CMI
+                torun = Clock('Torun', 53.0000, 18.6038, country='Poland')  # AMO (?)
+                posen = Clock('Posen', 52.4071, 16.9538, country='Poland')  # PSNC
+                warsaw = Clock('Warsaw', 52.2000, 21.0000, country='Poland')  # GUM
+                helsinki = Clock('Helsinki', 60.1800, 24.8257, country='Finland')  # VTT MIKES
+                gothenburg = Clock('Gothenburg', 57.6858, 11.9556, country='Sweden')  # RISE
+                
+                self.add_clock(braunschweig)
+                self.add_clock(wettzell)
+                self.add_clock(bonn)
+                self.add_clock(munich)
+                self.add_clock(potsdam)
+                self.add_clock(delft)
+                self.add_clock(london)
+                self.add_clock(paris)
+                self.add_clock(strasbourg)
+                self.add_clock(bern)
+                self.add_clock(torino)
+                self.add_clock(vienna)
+                self.add_clock(ljubljana)
+                self.add_clock(prague)
+                self.add_clock(torun)
+                self.add_clock(warsaw)
+                self.add_clock(posen)
+                self.add_clock(helsinki)
+                self.add_clock(gothenburg)
         elif name == 'eike_sg':
             filename = '/home/schroeder/CLONETS/data/NGL_gnss_Stations.txt'
             stations = utils.load_ngl(filename)
@@ -1784,7 +1882,8 @@ class Network():
         return fig
     
     def plotESC(self, esc, t, unitFrom, unitTo, t_ref=None, save=False,
-                degreevariances=False, relief=False, lmin=False, lmax=False):
+                degreevariances=False, relief=False, lmin=False, lmax=False,
+                world=False):
         """Plots the earth system component signal on a map.
         
         :param esc: earth system component
@@ -1829,7 +1928,9 @@ class Network():
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'H_snow': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'O': 'O_',
+                    'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
 
         path = cfg.PATHS['data_path']
         savepath = path + '../fig/'
@@ -1860,8 +1961,12 @@ class Network():
         if unitTo in('N', 'h', 'GRACE'):
             grid.data = grid.data * 1e3
         
-        fig = self.plot_europe_720(grid, path+esc+'/', '', esc, unitTo,
+        if world:
+            fig = self.plot_world_720(grid, path+esc+'/', '', esc, unitTo,
                                    cb_dict, 'esc', t)
+        else:
+            fig = self.plot_europe_720(grid, path+esc+'/', '', esc, unitTo,
+                                       cb_dict, 'esc', t)
         
         if save:
             if save=='png':
@@ -1875,7 +1980,8 @@ class Network():
                     savename = savename[:-4] + 'lmin' + str(lmin) + '.png'
                 if lmax:
                     savename = savename[:-4] + 'lmax' + str(lmax) + '.png'
-                fig.savefig(savename)
+                if world:
+                    savename = savename[:-4] + '_world.png'
             else:
                 if t_ref:
                     savename = (os.path.join(savepath, esc, esc_dict[esc] + t + '-'
@@ -1887,11 +1993,13 @@ class Network():
                     savename = savename[:-4] + 'lmin' + str(lmin) + '.pdf'
                 if lmax:
                     savename = savename[:-4] + 'lmax' + str(lmax) + '.pdf'
-                fig.savefig(savename)
+                if world:
+                    savename = savename[:-4] + '_world.png'
+            fig.savefig(savename)
         return fig, grid
     
     def plotESCatClocks(self, esc, t, unitFrom, unitTo, t_ref=None,
-                        loc_ref=False, save=False):
+                        loc_ref=False, save=False, world=False):
         """Plots the earth system component signal on a map.
         
         :param esc: earth system component
@@ -1921,6 +2029,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -1936,6 +2045,7 @@ class Network():
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
+                    'O': 'O_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
 
         path = cfg.PATHS['data_path']
@@ -1963,21 +2073,40 @@ class Network():
             
         if unitTo in('N', 'h', 'GRACE'):
             points = points * 1e3
-        datamax = 4 # max(abs(points))
+        datamax = 4#max(abs(points))
         print(points)
+        print(min(points), max(points))
         
         data = {'data': points, 'lat': self.lats(), 'lon': self.lons()}
         df = pd.DataFrame(data)
 
         fig = pygmt.Figure()
+        with pygmt.clib.Session() as session:
+            if world:
+                session.call_module('gmtset', 'FONT 15p')
+            else:
+                session.call_module('gmtset', 'FONT 20p')
         pygmt.makecpt(cmap='roma', series=[-datamax, datamax], reverse=False)
-        fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame="a",
-                  shorelines="1/0.1p,black", borders="1/0.1p,black",
-                  land='grey')
+        # fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i", frame=["a", "WSne"],
+        #           shorelines="1/0.1p,black", borders="1/0.1p,black",
+        #           land='grey')
+        if world:
+            fig.coast(projection="R15c", region="d", frame=["a", "WSne"],
+                      shorelines="1/0.1p,black", borders="1/0.1p,black",
+                      land='grey')
+        else:
+            fig.coast(region=[-30, 30, 20, 75], projection="S0/90/6i", frame=["a", "WSne"],
+                      shorelines="1/0.1p,black", borders="1/0.1p,black",
+                      land='grey')
         # TODO: könnte colorbar zero nicht in der mitte haben... überprüfen!
-        fig.plot(x=df.lon, y=df.lat, style='c0.13i', color=(df.data/4.05+1)/2,
+        fig.plot(x=df.lon, y=df.lat, style='c0.11i', color=(df.data/4.05+1)/2,
                  cmap='roma')
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        with pygmt.clib.Session() as session:
+            if world:
+                session.call_module('gmtset', 'FONT 18p')
+            else:
+                session.call_module('gmtset', 'FONT 24p')       
+        fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         if save:
             if t_ref:
@@ -2046,10 +2175,10 @@ class Network():
                     'H': 'clm_tws_',
                     'A': 'coeffs_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
-                   'N': '"RMS of Geoid height [mm]"',
+                   'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
                    'sd': '"RMS of Surface Density [kg/m@+2@+]"',
-                   'ewh': '"RMS of Equivalent water height [m]"',
+                   'ewh': '"Mass variability in EWH [m]"',
                    'gravity': '"RMS of gravitational acceleration [m/s@+2@+]"',
                    'ff': '"RMS of Fractional frequency [-]"',
                    'GRACE': '"RMS of Geoid height [mm]"'}
@@ -2065,7 +2194,10 @@ class Network():
         
         if isinstance(T[0], str):
             T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
-        T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        try:
+            T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        except: 
+            T_frac = np.array([utils.datetime2frac(t) for t in T])
         # make strings if time is given in datetime objects
         if not isinstance(T[0], str):
             if hourly:
@@ -2231,10 +2363,10 @@ class Network():
                     'H': 'clm_tws_',
                     'A': 'coeffs_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
-                   'N': '"RMS of Geoid height [mm]"',
+                   'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
                    'sd': '"RMS of Surface Density [kg/m@+2@+]"',
-                   'ewh': '"RMS of Equivalent water height [m]"',
+                   'ewh': '"Mass variability in EWH [m]"',
                    'gravity': '"RMS of gravitational acceleration [m/s@+2@+]"',
                    'ff': '"RMS of Fractional frequency [-]"',
                    'GRACE': '"RMS of Geoid height [mm]"'}
@@ -2493,6 +2625,7 @@ class Network():
         fig.plot(x=df.lon, y=df.lat, style='c0.1i', color=df.data/datamax,
                  cmap='drywet')
         # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
+        # fig.colorbar(position='JMR', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
 
         if save:
@@ -2642,6 +2775,12 @@ class Network():
                     plt.plot(T, data)
                 else:
                     plt.plot(T, data, label=clo.location)
+                if loc_ref:
+                    np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                            unitTo + '_' + clo.location + '-' + loc_ref, data)
+                else:
+                    np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                            unitTo + '_' + clo.location, data)
             else:
                 number -= 1
         # clo = self.search_clock('location', 'Braunschweig')[0]
@@ -2742,6 +2881,13 @@ class Network():
                     plt.plot(f[3:]*86400*365, freq[3:], '.-', label=clo.location)
                 else:
                     plt.plot(f[1:]*86400*365, freq[1:], '.-', label=clo.location)
+                
+                if loc_ref:
+                    np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + 
+                            '_freq_' + clo.location + '-' + loc_ref, freq[1:])
+                else:
+                    np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc +
+                            '_freq_' + clo.location, freq[1:])
             else:
                 number -= 1
                 
@@ -2815,7 +2961,7 @@ class Network():
                        for f in files]  # 12 sh sets with the errors ...
         # Error Propagation # TODO: this only works for 'pot' to 'N', so dont use this function with other units...
         sigma_xx1 = np.array([harmony.Sigma_xx_2points_from_formal(
-            x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=100)   
+            x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=100, gaussian=350)
             for x in sigma_grace])  # [m]
         sigma_xx2 = np.array([harmony.Sigma_xx_2points_from_formal(
             x, clo0.lon, clo0.lat, clo1.lon, clo1.lat, lmax=80)   
@@ -2899,7 +3045,47 @@ class Network():
                                          + loc + '.pdf'))
             plt.savefig(savename)
         
-        return fig, t, tm, data, grace, sigma1, s_grace1
+        return (fig, t, tm, data, grace, np.array([sigma1, sigma2, sigma3]),
+                np.array([s_grace1, s_grace2, s_grace3]))
+        
+    def plot_world_720(self, grid, path, trend, esc, unitTo, cb_dict,
+                        inp_func, t):
+        
+        x = grid.lons()
+        y = grid.lats()
+        datamax = np.max(abs(grid.data))
+        print(datamax)
+        datamax = 4  # WATCH OUT
+        
+        da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
+        # save the dataarray as netcdf to work around the 360° plotting problem
+        da.to_dataset(name='dataarray').to_netcdf(path + '../temp/pygmt.nc')
+        with pygmt.clib.Session() as session:
+            session.call_module('gmtset', 'FONT 15p')
+        fig = pygmt.Figure()
+        if trend == 'trend':
+            pygmt.makecpt(cmap='polar', series=[-datamax, datamax],
+                          reverse=True)
+        elif inp_func == 'esc':
+            pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
+        else:
+            pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
+        fig.grdimage(path + '../temp/pygmt.nc', projection="R15c", region="d", 
+                     frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
+        if (esc == 'H' or esc == 'I') and unitTo == 'ewh':
+            fig.coast(shorelines="1/0.1p,black", projection="R15c", region="d", 
+                      borders="1/0.1p,black", water='white')
+        else:
+            fig.coast(shorelines="1/0.1p,black", projection="R15c", region="d", 
+                      borders="1/0.1p,black")
+        fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
+                 pen="black")
+        with pygmt.clib.Session() as session:
+            session.call_module('gmtset', 'FONT 18p')
+        fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        
+        return fig
+
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
                         inp_func, t):
@@ -2910,11 +3096,14 @@ class Network():
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
+        print(datamax)
         datamax = 4  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
         da.to_dataset(name='dataarray').to_netcdf(path + '../temp/pygmt.nc')
+        with pygmt.clib.Session() as session:
+            session.call_module('gmtset', 'FONT 20p')
         fig = pygmt.Figure()
         if trend == 'trend':
             pygmt.makecpt(cmap='polar', series=[-datamax, datamax],
@@ -2923,18 +3112,22 @@ class Network():
             pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
         else:
             pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
-        fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
-                     projection="S10/90/6i", frame="ag")  # frame: a for the standard frame, g for the grid lines
+        # fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
+        #              projection="S10/90/6i", frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
+        fig.grdimage(path + '../temp/pygmt.nc', region=[-30, 30, 20, 75],
+                     projection="S0/90/6i", frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
         if (esc == 'H' or esc == 'I') and unitTo == 'ewh':
             fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
-                      frame="a", shorelines="1/0.1p,black",
+                      shorelines="1/0.1p,black",
                       borders="1/0.1p,black", water='white')
         else:
-            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
-                      frame="a", shorelines="1/0.1p,black",
+            fig.coast(region=[-30, 30, 20, 75], projection="S0/90/6i",
+                      shorelines="1/0.1p,black",
                       borders="1/0.1p,black")
         fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
                  pen="black")
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo]+t)  # @+x@+ for ^x
+        with pygmt.clib.Session() as session:
+            session.call_module('gmtset', 'FONT 24p')
+        fig.colorbar(position='JMR+w15c/0.7c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         return fig
