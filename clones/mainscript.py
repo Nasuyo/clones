@@ -390,9 +390,9 @@ fig.show()
 
 # Video
 # T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
-for d1 in T:
-    fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0, save='png',
-                                world=True)
+# for d1 in T:
+#     fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0, save='png',
+#                                 world=True)
     
     
 
