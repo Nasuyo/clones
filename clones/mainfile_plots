@@ -1,0 +1,500 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Created on Mon Mar  1 12:19:02 2021
+
+@author: schroeder
+"""
+
+    #     next(axes[1, 1]._get_lines.prop_cycler)
+
+import numpy as np
+import datetime
+import matplotlib.pyplot as plt
+from clones import utils
+
+# Daily datetime timeseries ---------------------------------------------------
+t0 = datetime.date(2007, 1, 1)
+T = [t0 + datetime.timedelta(d) for d in range(0, 365)]
+
+# General Setting -------------------------------------------------------------
+path = '../../data/ts_results/'
+plt.rcParams.update({'font.size': 13})  # set before making the figure!        
+plt.rcParams['axes.grid'] = True
+sof = (12, 6)  # size of figure
+bb = (1.05, -0.4)  # bbox coordinates for a 1x6 legend
+# bb = (1.1, -0.55)  # bbox coordinates for a 2x3 legend
+legcol = 6  # colums for the legend
+ewhlabel = 'Mass in EWH [mm]'
+hlabel = 'Vertical displacement [mm]'
+Nlabel = 'Geoid height [mm]'
+fflabel = 'Fractional frequency'
+
+# # Fig. 3: Hydrology time series
+# loc = ['Braunschweig', 'London', 'Bern', 'Warsaw', 'Gothenburg', 'Helsinki']
+# ewh = np.zeros((365, len(loc)))
+# h = np.zeros((365, len(loc)))
+# N = np.zeros((365, len(loc)))
+# ff = np.zeros((365, len(loc)))
+# for i, l in enumerate(loc):
+#     ewh[:, i] = np.load(path + 'H_ewh_' + l + '.npy') * 1e3
+#     h[:, i] = np.load(path + 'H_h_' + l + '.npy')
+#     N[:, i] = np.load(path + 'H_N_' + l + '.npy')
+#     ff[:, i] = np.load(path + 'H_ff_' + l + '.npy')
+# # plot
+# fig, axes = plt.subplots(figsize=sof, nrows=2, ncols=2)
+# for i, l in enumerate(loc):
+#     axes[0, 0].plot(T, ewh[:, i], label=loc)
+#     axes[0, 1].plot(T, h[:, i], label=loc)
+#     axes[1, 0].plot(T, N[:, i], label=loc)
+#     axes[1, 1].plot(T, ff[:, i], label=loc)
+# axes[0, 0].set_xticklabels([])
+# axes[0, 1].set_xticklabels([])
+# axes[1, 0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[1, 1].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0, 0].set_ylabel(ewhlabel)
+# axes[0, 1].set_ylabel(hlabel)
+# axes[1, 0].set_ylabel(Nlabel)
+# axes[1, 1].set_ylabel(fflabel)
+# axes[1, 0].legend(loc, loc='lower center', bbox_to_anchor=bb, ncol=legcol)
+# axes[0, 0].annotate('a)', (3, 130), xycoords='axes pixels')
+# axes[0, 1].annotate('b)', (3, 130), xycoords='axes pixels')
+# axes[1, 0].annotate('c)', (3, 130), xycoords='axes pixels')
+# axes[1, 1].annotate('d)', (3, 130), xycoords='axes pixels')
+
+# plt.savefig('../../fig/timeseries/fig3.pdf')
+
+
+# ## Fig. 4: Braunschweig time and frequency domain
+# data = np.load(path + 'H_ff_Braunschweig.npy')
+# noisee18 = np.load(path + 'H_ff_Braunschweig_noise0.npy')
+# noisee19 = np.load(path + 'H_ff_Braunschweig_noise1.npy')
+# noisee20 = np.load(path + 'H_ff_Braunschweig_noise2.npy')
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.load(path + 'H_freq_Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+# #plot
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# axes[0].plot(T, data, label='data', linewidth=1.5, zorder=2)
+# axes[0].plot(T, noisee18, linewidth=0.5, label='data + noise scenario 1 (expected)', zorder=0)
+# axes[0].plot(T, noisee19, linewidth=1.0, color='tab:red', label='data + noise scenario 2 (desired)', zorder=1)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].legend(loc='lower center', bbox_to_anchor=(0.45, -0.6), ncol=1)
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_data, '.-', label='data')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 128), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 107), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 90), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(0.2, -0.6), ncol=1)
+# plt.savefig('../../fig/timeseries/fig4.pdf', bbox_inches='tight')
+
+# ## Fig. 5: Bern-Braunschweig time and frequency domain
+# data = np.load(path + 'H_ff_Bern-Braunschweig.npy')
+# noisee18 = np.load(path + 'H_ff_Bern-Braunschweig_noise0.npy')
+# noisee19 = np.load(path + 'H_ff_Bern-Braunschweig_noise1.npy')
+# noisee20 = np.load(path + 'H_ff_Bern-Braunschweig_noise2.npy')
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.load(path + 'H_freq_Bern-Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy') * np.sqrt(2)
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# axes[0].plot(T, data, label='data', linewidth=1.5, zorder=2)
+# axes[0].plot(T, noisee18, linewidth=0.5, label='data + noise scenario 1 (expected)', zorder=0)
+# axes[0].plot(T, noisee19, linewidth=1.0, color='tab:red', label='data + noise scenario 2 (desired)', zorder=1)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].legend(loc='lower center', bbox_to_anchor=(0.45, -0.6), ncol=1)
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_data, '.-', label='data')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 152), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 130), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 110), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(0.2, -0.6), ncol=1)
+# plt.savefig('../../fig/timeseries/fig5.pdf', bbox_inches='tight')
+
+
+# ## Fig. 6: Part of network time and frequency domain
+# loc = ['London', 'Bern', 'Warsaw', 'Helsinki', 'Gothenburg']    
+# data = np.zeros((365, len(loc)))
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.zeros((len(x_freq), len(loc)))
+# for i, l in enumerate(loc):
+#     data[:, i] = np.load(path + 'H_ff_' + l + '-Braunschweig.npy')
+#     f_data[:, i] = np.load(path + 'H_freq_' + l + '-Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy') * np.sqrt(2)
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# next(axes[0]._get_lines.prop_cycler)
+# next(axes[1]._get_lines.prop_cycler)
+# for i, l in enumerate(loc):
+#     axes[0].plot(T, data[:, i], label=l)
+#     axes[1].plot(x_freq, f_data[:, i], '.-', label=l)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 152), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 130), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 110), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(-0.13, -0.45), ncol=6)
+# plt.savefig('../../fig/timeseries/fig6.pdf', bbox_inches='tight')
+
+
+## Atmosphere -----------------------------------------------------------------
+
+
+# ## Fig. 7: Atmosphere time series
+# plt.rcParams['axes.grid'] = True
+# loc = ['Braunschweig', 'London', 'Bern', 'Warsaw', 'Helsinki', 'Gothenburg']
+# ewh = np.zeros((365, len(loc)))
+# h = np.zeros((365, len(loc)))
+# N = np.zeros((365, len(loc)))
+# ff = np.zeros((365, len(loc)))
+# for i, l in enumerate(loc):
+#     ewh[:, i] = np.load(path + 'A_ewh_' + l + '.npy') * 1e3
+#     h[:, i] = np.load(path + 'A_h_' + l + '.npy')
+#     N[:, i] = np.load(path + 'A_N_' + l + '.npy')
+#     ff[:, i] = np.load(path + 'A_ff_' + l + '.npy')
+# # plot
+# fig, axes = plt.subplots(figsize=sof, nrows=2, ncols=2)
+# for i, l in enumerate(loc):
+#     axes[0, 0].plot(T, ewh[:, i], label=loc)
+#     axes[0, 1].plot(T, h[:, i], label=loc)
+#     axes[1, 0].plot(T, N[:, i], label=loc)
+#     axes[1, 1].plot(T, ff[:, i], label=loc)
+# axes[0, 0].set_xticklabels([])
+# axes[0, 1].set_xticklabels([])
+# axes[1, 0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[1, 1].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0, 0].set_ylabel(ewhlabel)
+# axes[0, 1].set_ylabel(hlabel)
+# axes[1, 0].set_ylabel(Nlabel)
+# axes[1, 1].set_ylabel(fflabel)
+# axes[1, 0].legend(loc, loc='lower center', bbox_to_anchor=bb, ncol=legcol)
+# axes[0, 0].annotate('a)', (3, 130), xycoords='axes pixels')
+# axes[0, 1].annotate('b)', (3, 130), xycoords='axes pixels')
+# axes[1, 0].annotate('c)', (3, 130), xycoords='axes pixels')
+# axes[1, 1].annotate('d)', (3, 130), xycoords='axes pixels')
+
+# plt.savefig('../../fig/timeseries/fig7.pdf')
+
+
+## Fig. 8: Braunschweig time and frequency domain
+
+# data = np.load(path + 'A_ff_Braunschweig.npy')
+# noisee18 = np.load(path + 'A_ff_Braunschweig_noise0.npy')
+# noisee19 = np.load(path + 'A_ff_Braunschweig_noise1.npy')
+# noisee20 = np.load(path + 'A_ff_Braunschweig_noise2.npy')
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.load(path + 'A_freq_Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# axes[0].plot(T, data, label='data', linewidth=1.0, zorder=2)
+# axes[0].plot(T, noisee18, linewidth=0.5, label='data + noise scenario 1 (expected)', zorder=0)
+# axes[0].plot(T, noisee19, linewidth=1.0, color='tab:red', label='data + noise scenario 2 (desired)', zorder=1)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].legend(loc='lower center', bbox_to_anchor=(0.45, -0.6), ncol=1)
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_data, '.-', label='data')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 117), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 82), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 55), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(0.2, -0.6), ncol=1)
+# plt.savefig('../../fig/timeseries/fig8.pdf', bbox_inches='tight')
+
+# ## Fig. 9: Bern-Braunschweig time and frequency domain
+# data = np.load(path + 'A_ff_Bern-Braunschweig.npy')
+# noisee18 = np.load(path + 'A_ff_Bern-Braunschweig_noise0.npy')
+# noisee19 = np.load(path + 'A_ff_Bern-Braunschweig_noise1.npy')
+# noisee20 = np.load(path + 'A_ff_Bern-Braunschweig_noise2.npy')
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.load(path + 'A_freq_Bern-Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy') * np.sqrt(2)
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# axes[0].plot(T, data, label='data', linewidth=1.0, zorder=2)
+# axes[0].plot(T, noisee18, linewidth=0.5, label='data + noise scenario 1 (expected)', zorder=0)
+# axes[0].plot(T, noisee19, linewidth=1.0, color='tab:red', label='data + noise scenario 2 (desired)', zorder=1)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].legend(loc='lower center', bbox_to_anchor=(0.45, -0.6), ncol=1)
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_data, '.-', label='data')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 138), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 100), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 73), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(0.2, -0.6), ncol=1)
+# plt.savefig('../../fig/timeseries/fig9.pdf', bbox_inches='tight')
+
+
+# # Fig. 10: Part of network time and frequency domain
+# loc = ['London', 'Bern', 'Warsaw', 'Helsinki', 'Gothenburg']    
+# data = np.zeros((365, len(loc)))
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.zeros((len(x_freq), len(loc)))
+# for i, l in enumerate(loc):
+#     data[:, i] = np.load(path + 'A_ff_' + l + '-Braunschweig.npy')
+#     f_data[:, i] = np.load(path + 'A_freq_' + l + '-Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy') * np.sqrt(2)
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# next(axes[0]._get_lines.prop_cycler)
+# next(axes[1]._get_lines.prop_cycler)
+# for i, l in enumerate(loc):
+#     axes[0].plot(T, data[:, i], label=l)
+#     axes[1].plot(x_freq, f_data[:, i], '.-', label=l)
+# axes[0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 133), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 102), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 80), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(-0.13, -0.45), ncol=6)
+# plt.savefig('../../fig/timeseries/fig10.pdf', bbox_inches='tight')
+
+
+# Fig. 11: Part of network time and frequency domain
+# Monthly string timeseries 3 years -------------------------------------------
+# months = ['%02d' % (i) for i in range(1, 13)] * 3
+# months.insert(0, months.pop())
+# months.insert(0, months.pop())
+# months.insert(0, months.pop())
+# years = 3 * ['2005'] + 12 * ['2006'] + 12 * ['2007'] + 9 * ['2008']
+# Ti = [y + '_' + m for (y, m) in zip(years, months)]
+# loc = ['London', 'Bern', 'Warsaw', 'Helsinki', 'Gothenburg']    
+# data = np.zeros((36, len(loc)))
+# x_freq = np.load(path + 'x_freq.npy')
+# f_data = np.zeros((18, len(loc)))
+# for i, l in enumerate(loc):
+#     data[:, i] = np.load(path + 'I_ff_' + l + '-Braunschweig.npy')
+#     f_data[:, i] = np.load(path + 'I_freq_' + l + '-Braunschweig.npy')
+# f_noise = np.load('/home/schroeder/CLONETS/data/noise.npy') * np.sqrt(2)
+# #plot
+# plt.rcParams['axes.grid'] = True
+# fig, axes = plt.subplots(figsize=(12, 3), nrows=1, ncols=2)
+# next(axes[0]._get_lines.prop_cycler)
+# next(axes[1]._get_lines.prop_cycler)
+# for i, l in enumerate(loc):
+#     axes[0].plot(Ti, data[:, i], label=l)
+#     axes[1].plot(x_freq[:18], f_data[:, i], '.-', label=l)
+# axes[0].set_xticks([4, 15, 27])
+# axes[0].set_xticklabels(['2006', '2007', '2008'])
+# axes[0].set_ylabel('Fractional Frequency')
+# axes[0].annotate('a)', (-45, 170), xycoords='axes pixels')
+# axes[1].plot(x_freq, f_noise[0, :], '--', color='black', label='noise levels')
+# axes[1].plot(x_freq, f_noise[1, :], '--', color='black')
+# axes[1].plot(x_freq, f_noise[2, :], '--', color='black')
+# axes[1].set_xlabel('Frequencies [1/yr]')
+# axes[1].set_yscale('log')
+# axes[1].set_xscale('log')
+# axes[1].set_xticklabels(['', '', '1', '10', '100'])
+# plt.rcParams['axes.grid'] = False
+# ax2 = axes[1].twiny()
+# ax2.set_xscale('log')
+# ax2.set_xlim([1, 180])
+# ax2.set_xticks([12, 44])
+# ax2.set_xticklabels(['monthly', 'weekly'])
+# ax2.minorticks_off()
+# axes[1].annotate('b)', (-45, 170), xycoords='axes pixels')
+# axes[1].annotate('1', (3, 151), xycoords='axes pixels')
+# axes[1].annotate('2', (4, 135), xycoords='axes pixels')
+# axes[1].annotate('3', (3, 120), xycoords='axes pixels')
+# axes[1].legend(loc='lower center', bbox_to_anchor=(-0.13, -0.45), ncol=6)
+# plt.savefig('../../fig/timeseries/fig11.pdf', bbox_inches='tight')
+
+
+## Fig. 14: GRACE comparison --------------------------------------------------
+plt.rcParams['axes.grid'] = True
+plt.rcParams.update({'font.size': 13})  # set before making the figure!        
+fig, axes = plt.subplots(nrows=2, ncols=2, figsize=(12, 6))
+# Bern daily
+tm = np.load(path + 'Bern_tm.npy', allow_pickle=True)
+data = np.load(path + 'Bern_data.npy')
+sigma = np.load(path + 'Bern_sigma.npy')
+grace = np.load(path + 'Bern_grace.npy')
+s_grace = np.load(path + 'Bern_s_grace.npy')
+axes[0, 0].plot(tm, grace, label='GRACE', color='tab:orange')
+axes[0, 0].plot(T, data, label='Network', color='tab:blue')
+axes[0, 0].fill_between(T, data+sigma[0], data-sigma[0], alpha=0.1, color='tab:blue')
+axes[0, 0].fill_between(T, data+sigma[1], data-sigma[1], alpha=0.2, color='tab:blue')
+axes[0, 0].fill_between(T, data+sigma[2], data-sigma[2], alpha=0.3, color='tab:blue',
+                  label='Network error')
+axes[0, 0].plot(tm, grace+s_grace[0, 0],  '--', color='tab:orange', label='GRACE error', linewidth=0.7)
+axes[0, 0].plot(tm, grace+s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 0].plot(tm, grace+s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 0].plot(tm, grace-s_grace[0, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 0].plot(tm, grace-s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 0].plot(tm, grace-s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 0].set_ylim([-10, 10])
+axes[0, 0].set_ylabel('Geoid height [mm]')
+axes[0, 0].set_xlim([T[0] + datetime.timedelta(-35), T[-1] + datetime.timedelta(35)])
+axes[0, 0].set_xticklabels([])
+# averaging to monthly clock data
+datam = utils.daily2monthly(T, data)
+sigma[0] = sigma[0] - 2 * np.sqrt(2) + 2 * np.sqrt(2) / np.sqrt(4)
+sigma[1] = sigma[1] - 1 * np.sqrt(2) + 1 * np.sqrt(2) / np.sqrt(4)
+sigma[2] = sigma[2] - 0.4 * np.sqrt(2) + 0.4 * np.sqrt(2) / np.sqrt(4)
+data = datam
+# Bern monthly
+axes[1, 0].plot(tm, grace, label='GRACE', color='tab:orange')
+axes[1, 0].plot(tm, data, label='Network', color='tab:blue')
+axes[1, 0].fill_between(tm, data+sigma[0], data-sigma[0], alpha=0.1, color='tab:blue')
+axes[1, 0].fill_between(tm, data+sigma[1], data-sigma[1], alpha=0.2, color='tab:blue')
+axes[1, 0].fill_between(tm, data+sigma[2], data-sigma[2], alpha=0.3, color='tab:blue',
+                  label='Network error')
+axes[1, 0].plot(tm, grace+s_grace[0, 0],  '--', color='tab:orange', label='GRACE error', linewidth=0.7)
+axes[1, 0].plot(tm, grace+s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 0].plot(tm, grace+s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 0].plot(tm, grace-s_grace[0, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 0].plot(tm, grace-s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 0].plot(tm, grace-s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 0].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+axes[1, 0].set_ylim([-10, 10])
+axes[1, 0].set_ylabel('Geoid height [mm]')
+axes[1, 0].set_xlim([T[0] + datetime.timedelta(-35), T[-1] + datetime.timedelta(35)])
+# Bonn daily
+tm = np.load(path + 'Bonn_tm.npy', allow_pickle=True)
+data = np.load(path + 'Bonn_data.npy')
+sigma = np.load(path + 'Bonn_sigma.npy')
+grace = np.load(path + 'Bonn_grace.npy')
+s_grace = np.load(path + 'Bonn_s_grace.npy')
+axes[0, 1].plot(tm, grace, label='GRACE', color='tab:orange')
+axes[0, 1].plot(T, data, label='Network', color='tab:blue')
+axes[0, 1].fill_between(T, data+sigma[0], data-sigma[0], alpha=0.1, color='tab:blue')
+axes[0, 1].fill_between(T, data+sigma[1], data-sigma[1], alpha=0.2, color='tab:blue')
+axes[0, 1].fill_between(T, data+sigma[2], data-sigma[2], alpha=0.3, color='tab:blue',
+                  label='Network error')
+axes[0, 1].plot(tm, grace+s_grace[0, 0],  '--', color='tab:orange', label='GRACE error', linewidth=0.7)
+axes[0, 1].plot(tm, grace+s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 1].plot(tm, grace+s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 1].plot(tm, grace-s_grace[0, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 1].plot(tm, grace-s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 1].plot(tm, grace-s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[0, 1].set_xticklabels([])
+axes[0, 1].set_ylim([-10, 10])
+axes[0, 1].set_xlim([T[0] + datetime.timedelta(-35), T[-1] + datetime.timedelta(35)])
+# averaging to monthly clock data
+datam = utils.daily2monthly(T, data)
+sigma[0] = sigma[0] - 2 * np.sqrt(2) + 2 * np.sqrt(2) / np.sqrt(4)
+sigma[1] = sigma[1] - 1 * np.sqrt(2) + 1 * np.sqrt(2) / np.sqrt(4)
+sigma[2] = sigma[2] - 0.4 * np.sqrt(2) + 0.4 * np.sqrt(2) / np.sqrt(4)
+data = datam
+# Bonn monthly
+axes[1, 1].plot(tm, grace, label='GRACE', color='tab:orange')
+axes[1, 1].plot(tm, data, label='Network', color='tab:blue')
+axes[1, 1].fill_between(tm, data+sigma[0], data-sigma[0], alpha=0.1, color='tab:blue')
+axes[1, 1].fill_between(tm, data+sigma[1], data-sigma[1], alpha=0.2, color='tab:blue')
+axes[1, 1].fill_between(tm, data+sigma[2], data-sigma[2], alpha=0.3, color='tab:blue',
+                  label='Network error')
+axes[1, 1].plot(tm, grace+s_grace[0, 0],  '--', color='tab:orange', label='GRACE error', linewidth=0.7)
+axes[1, 1].plot(tm, grace+s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 1].plot(tm, grace+s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 1].plot(tm, grace-s_grace[0, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 1].plot(tm, grace-s_grace[1, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 1].plot(tm, grace-s_grace[2, 0],  '--', color='tab:orange', linewidth=0.7)
+axes[1, 1].set_xticklabels(['Jan', 'Mar', 'May', 'Jul', 'Sep', 'Nov', 'Jan'])
+axes[1, 1].set_ylim([-10, 10])
+axes[1, 1].set_xlim([T[0] + datetime.timedelta(-35), T[-1] + datetime.timedelta(35)])
+axes[0, 0].annotate('a)', (5, 130), xycoords='axes pixels')
+axes[0, 1].annotate('b)', (5, 130), xycoords='axes pixels')
+axes[1, 0].annotate('c)', (5, 130), xycoords='axes pixels')
+axes[1, 1].annotate('d)', (5, 130), xycoords='axes pixels')
+axes[0, 1].legend(loc='lower center', bbox_to_anchor=(-0.16, -1.6), ncol=4)
+plt.savefig('../../fig/timeseries/fig14.pdf', bbox_inches='tight')

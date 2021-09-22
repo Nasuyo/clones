@@ -5,7 +5,7 @@ Created on Wed Nov 13 10:12:00 2019
 
 @author: schroeder
 
-Module that contains everything that has to do with spherical harmonics.
+Module containing everything that has to do with spherical harmonics.
 """
 
 # Imports ---------------------------------------------------------------------
@@ -411,7 +411,7 @@ def read_SHCoeffs_errors(path, headerlines, k=True):
                                                  (2, 0, 1)))
     return {'coeffs': coeffs, 'sigma': sigma}
 
-def read_SHCoeffs(path, headerlines, k=True, lastline=False):#D=False):
+def read_SHCoeffs(path, headerlines, k=True, lastline=False, D=False):
     """Reads an ascii file with spherical harmonics.
     
     The columns have to be key, L, M, C, S. Returns pyshtools.SHCoeffs object.
@@ -430,12 +430,12 @@ def read_SHCoeffs(path, headerlines, k=True, lastline=False):#D=False):
         rows = []
         for line in f:
             row = line.split()
+            if D:
+                row[3:] = [s.replace('D', 'E') for s in row[3:]]
             if k:
                 row = [float(i) for i in row[1:]]
             else:
                 row = [float(i) for i in row]
-            # if D:
-            #     row[3:] = [s.replace('D', 'E') for s in row[3:]]
             row[0:2] = [int(i) for i in row[0:2]]
             rows.append(row)
     if lastline:
@@ -509,6 +509,110 @@ def amplitude_spectrum(C, dt):
     v = np.arange(0, vn, dv)
     
     return v, A
+
+def read_cov(filename, lmax, d0=False, d1=False):
+    """Read in spherical harmonic coefficients' covariance matrix."""
+    
+    dim = (lmax+1)**2 - 4
+    if d0:
+        dim += 1 
+    if d1:
+        dim += 3
+    
+    with open(filename) as f:
+        for i in range(2):
+            print(f.readline(), end='')
+        C = np.empty((dim, dim))
+        C[:] = np.nan
+        for i, line in enumerate(f):
+            row = line.split()
+            row = [float(i) for i in row]
+            C[i, i:] = np.array(row)
+            C[i:, i] = np.array(row)
+    return C
+
+def variances_from_cov(C, lmax, order='order', d0=False, d1=False):
+    """Get the variances from the covariance matrix."""
+    
+    Cd = np.diag(C)
+    var = sh.SHCoeffs.from_zeros(lmax)
+    i = 0
+    for order in range(lmax+1):
+        for degree in range(order, lmax+1):
+            if degree==0 and d0==False or degree==1 and d1==False:
+                continue
+            var.coeffs[0, degree, order] = Cd[i]
+            i += 1
+            if order > 0:
+                var.coeffs[1, degree, order] = Cd[i]
+                i += 1
+    return var
+
+def degree_variances_from_variances(var, To='pot'):
+    """Converts spherical harmonic coefficients to degree variances.
+    
+    :param var: variance coefficients
+    :type var: pyshtools.SHCoeffs
+    :param To: output unit
+    :type To: str
+    """
+    
+    try:
+        R = sh.constants.Earth.wgs84.r3.value  # mean radius of the Earth [m]
+    except:
+        R = sh.constant.r3_wgs84.value  # mean radius of the Earth [m]
+    kappa = np.zeros(var.lmax+1)
+    
+    for l in range(var.lmax+1):
+        for m in range(l+1):
+            kappa[l] = kappa[l] + var.coeffs[0, l, m] + var.coeffs[1, l, m]
+    if To == 'N':
+        kappa = kappa * R**2  # [m^2]
+    return kappa
+
+def degree_amplitudes_from_degree_variances(kappa, From, To, cumulative=False):
+    """Converts degree variances to (cumulative) degree amplitudes.
+    
+    :param kappa: degree variances
+    :type kappa: np.array of floats
+    :param From: unit of the variances
+    :type From: str
+    :param To: unit of the amplitudes
+    :type To: str
+    :param cumulative: cumulative degree variances or not
+    :type cumulative: boolean
+    """
+    
+    N = len(kappa)
+    if To == 'ewh' and From != 'ewh':
+        with open('lln.json') as f:
+            lln = np.array(json.load(f))
+        lln_k1 = lln[:, 3] + 1
+        lln_k1[1] = 0.02601378180 + 1  # from CM to CF
+        geoid2ewh = np.array([5513.59/3/1025 * (2*i+1) / lln_k1[i] for i in range(1025)])
+    
+    if cumulative:
+        if From == 'N':
+            if To == 'N':
+                sigma = np.array([np.sqrt(np.sum(kappa[1:i+1]))
+                                  for i in range(N)])
+            if To == 'ewh':
+                sigma = np.zeros(N)
+                for i in range(N):
+                    for j in range(i+1):
+                        sigma[i] += geoid2ewh[j]**2 * kappa[j]
+                sigma = np.sqrt(sigma)     
+        else:  # TODO
+            print('Not yet implemented!')
+    else:
+        if From == 'N':
+            if To == 'N':
+                sigma = np.sqrt(kappa)
+            if To == 'ewh':
+                sigma = geoid2ewh[:N] * np.sqrt(kappa)
+        else:  # TODO
+            print('Not yet implemented!')
+    return sigma
 
 def time2freq(delta_t, signal):
     """Uses scipy's fftpack.fft to Fourier-transform the timeseries.
