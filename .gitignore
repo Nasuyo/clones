@@ -4,6 +4,8 @@ docs/scripts/__pycache__/*
 docs/scripts/*.py
 clones/__pycache__/*
 clones/__pycache__/
+clones/D.npy
 __pycache__/*
 .idea
 *.egg-info
+
