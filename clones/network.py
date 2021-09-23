@@ -2106,17 +2106,29 @@ class Network():
                 session.call_module('gmtset', 'FONT 18p')
             else:
                 session.call_module('gmtset', 'FONT 24p')       
-        fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(position='JMR+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         if save:
-            if t_ref:
-                fig.savefig(os.path.join(savepath, esc, esc_dict[esc] + t
-                                         + '-' + t_ref + '_' + unitTo
-                                         + '_clockwise.pdf'))    
+            if save=='png':
+                if t_ref:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t + '-'
+                                             + t_ref + '_' + unitTo + '_clockwise.png'))
+                else:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t
+                                             + '_' + unitTo + '_clockwise.png'))
+                if world:
+                    savename = savename[:-4] + '_world.png'
             else:
-                fig.savefig(os.path.join(savepath, esc, esc_dict[esc] + t
-                                         + '_' + unitTo +
-                                         + '_clockwise.pdf'))
+                if t_ref:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t + '-'
+                                             + t_ref + '_' + unitTo + '_clockwise.pdf'))
+                else:
+                    savename = (os.path.join(savepath, esc, esc_dict[esc] + t
+                                             + '_' + unitTo + '_clockwise.pdf'))
+                if world:
+                    savename = savename[:-4] + '_world.png'
+            fig.savefig(savename)
+
         return fig, points
     
     def plotRMS(self, T, esc, unitFrom, unitTo, reset=False, save=False,
@@ -3128,6 +3140,6 @@ class Network():
                  pen="black")
         with pygmt.clib.Session() as session:
             session.call_module('gmtset', 'FONT 24p')
-        fig.colorbar(position='JMR+w15c/0.7c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(position='JMR+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         return fig
