@@ -2106,7 +2106,8 @@ class Network():
                 session.call_module('gmtset', 'FONT 18p')
             else:
                 session.call_module('gmtset', 'FONT 24p')       
-        fig.colorbar(position='g29/12+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        # fig.colorbar(position='g29/12+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         if save:
             if save=='png':
