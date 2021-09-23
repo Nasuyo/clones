@@ -382,7 +382,7 @@ fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0,
                                     world=True, save=False)#,
                                     # loc_ref='Braunschweig')
 # fig, data2 = CLONETS.plotESC(esc, d1, 'pot', unitTo, t_ref=d0, save=False,
-#                              world=True)#, lmax=40)
+#                               world=True)#, lmax=40)
 fig.show()
 
 # fig, ax = plt.subplots(figsize=(2, 3))
@@ -390,9 +390,9 @@ fig.show()
 
 # Video
 # T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
-# for d1 in T:
-#     fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0, save='png',
-#                                 world=True)
+for d1 in T:
+    fig, data = CLONETS.plotESC(esc, d1, 'pot', unitTo, t_ref=d0, save='png',
+                                        world=False)
     
     
 
