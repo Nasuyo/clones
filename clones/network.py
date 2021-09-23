@@ -2106,7 +2106,7 @@ class Network():
                 session.call_module('gmtset', 'FONT 18p')
             else:
                 session.call_module('gmtset', 'FONT 24p')       
-        fig.colorbar(position='JMR+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(position='g29/12+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         if save:
             if save=='png':
@@ -3140,6 +3140,6 @@ class Network():
                  pen="black")
         with pygmt.clib.Session() as session:
             session.call_module('gmtset', 'FONT 24p')
-        fig.colorbar(position='JMR+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        fig.colorbar(position='g29/12+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         return fig
