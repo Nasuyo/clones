@@ -307,6 +307,7 @@ class Clock():
                     'I_scandinavia': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
+                    'O': 'O_', 
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
         
         # TODO: Check whether the timeseries is already there
@@ -438,6 +439,7 @@ class Clock():
                     'I_scandinavia': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
+                    'O': 'O_', 
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
         
         # TODO: Check whether the timeseries is already there
@@ -807,7 +809,8 @@ class Clock():
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'O': 'O_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"RMS of Geoid height [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -1026,7 +1029,7 @@ class Link():
             
     def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
                        reset=False, error=False, sigma=False, filt=False,
-                       lmax=False, save=False):
+                       lmax=False, save=False, vmin=False, vmax=False):
         """Plots the differential time series.
         
         Uses sh2timeseries() for both clocks and plots the resulting
@@ -1147,6 +1150,7 @@ class Link():
                         data_b = data_b * 1e3
                 plt.plot(T, data_b-data_a, label=esc)
         
+        if vmin: plt.ylim([vmin, vmax])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
         plt.title(self.b.location + ' - ' + self.a.location)
@@ -1156,10 +1160,11 @@ class Link():
         
         np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' + unitTo +
                 '_' + self.b.location + '-' + self.a.location, data_b-data_a)
-        for i, noi in enumerate(noise):
-            np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
-                    unitTo + '_' + self.b.location + '-' + self.a.location +
-                    '_noise' + str(i), data+noi)
+        if sigma:
+            for i, noi in enumerate(noise):
+                np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                        unitTo + '_' + self.b.location + '-' + self.a.location +
+                        '_noise' + str(i), data+noi)
             
         if save:
             path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
@@ -1169,6 +1174,53 @@ class Link():
             #TODO: case for esc is list
         
         return data_b-data_a
+    
+    def plotTimeseriesIncrements(self, T, esc, unitFrom, unitTo, t_ref=False,
+                                 reset=False, error=False, sigma=False,
+                                 filt=False, lmax=False, save=False, vmin=False,
+                                 vmax=False):
+        """."""
+        
+        unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
+                    'N': 'Geoid height [mm]',
+                    'h': 'Elevation [mm]',
+                    'sd': 'Surface Density [kg/m$^2$]',
+                    'ewh': 'Equivalent water height [m]',
+                    'gravity': 'gravitational acceleration [m/s$^2$]',
+                    'ff': 'Fractional frequency [-]'}
+        plt.rcParams.update({'font.size': 13})  # set before making the figure!        
+        fig, ax = plt.subplots()
+        
+        T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
+                                           t_ref=t_ref, reset=reset,
+                                           filt=filt, lmax=lmax)
+        T_b, data_b = self.b.sh2timeseries(T, esc, unitFrom, unitTo,
+                                           t_ref=t_ref, reset=reset,
+                                           filt=filt, lmax=lmax)
+        data_a, data_b = np.array(data_a), np.array(data_b)
+        if unitTo in('N', 'h', 'GRACE'):
+                data_a = data_a * 1e3
+                data_b = data_b * 1e3
+                
+        for i in range(len(T)):
+            
+            plt.plot(T, (data_b+1)*1e10, '.')
+            plt.plot(T[:i+1], data_b[:i+1]-data_a[:i+1], label=esc,
+                     color='tab:blue')
+            plt.plot(T[i], data_b[i]-data_a[i], 'o', mfc='none',
+                     color='tab:red', MarkerSize=15, label=esc)
+            
+            if vmin: plt.ylim([vmin, vmax])
+            plt.grid()
+            plt.ylabel(unit_dict[unitTo])
+            plt.xticks(rotation=90)
+            plt.title(self.b.location + ' - ' + self.a.location)
+            plt.tight_layout()
+            path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
+                    + '_' + self.a.location 
+                    + '_' + self.b.location + '_' + f'{i+1:02}' + '.png')
+            plt.savefig(path, dpi=300)
+            plt.show()
         
     def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
                             fmax=False, t_ref=False, reset=False, error=False,
@@ -1534,6 +1586,11 @@ class Network():
                 self.add_clock(posen)
                 self.add_clock(helsinki)
                 self.add_clock(gothenburg)
+                
+                self.add_link(braunschweig, bern, 5)
+                self.add_link(braunschweig, self.search_clock('location', 'VIRGINIA KEY, FL')[0])
+                self.add_link(self.search_clock('location', 'DUNKERQUE')[0], self.search_clock('location', 'VIRGINIA KEY, FL')[0])
+                self.add_link(self.search_clock('location', 'DUNKERQUE')[0], self.search_clock('location', 'BARCELONA')[0])
         elif name == 'eike_sg':
             filename = '/home/schroeder/CLONETS/data/NGL_gnss_Stations.txt'
             stations = utils.load_ngl(filename)
@@ -2186,7 +2243,8 @@ class Network():
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'O': 'O_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -2374,7 +2432,8 @@ class Network():
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'O': 'O_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -2576,7 +2635,8 @@ class Network():
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
-                    'A': 'coeffs_'}
+                    'A': 'coeffs_',
+                    'O': 'O_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"RMS of Geoid height [mm]"',
                    'h': '"RMS of Elevation [mm]"',
