@@ -26,28 +26,37 @@ def sh2sh(f_lm, From, To, lmax=False):
     
     Converter for spherical harmonic coefficients' form and unit.
     
-    :param f_lm: coefficients
-    :type f_lm: pyshtools.SHCoeffs
-    :param From: input unit
-    :type From: str
-    :param To: output unit
-    :type To: str
-    :return: the transformed coefficients
-    :rtype: pyshtools.SHCoeffs
+    Parameters
+    ----------
+    f_lm: pyshtools.SHCoeffs
+        coefficients
+    From: str
+        input unit
+    To: str
+        output unit
+    lmax: int, optional
+        maximum spherical harmonic degree of the returned coefficients, 
+        constructed either by cutting or zeropadding
     
-    Possible units:
-        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-            'U' ... geopotential [m^2/s^2]
-            'N' ... geoid height [m]
-            'GRACE' ... geoid height [m], but with lmax=120 and filtered
-        'ff' ... fractional frequency [-]
-        'h' .... elevation [m]
-        'mass' ... dimensionless surface loading coeffs
-            'sd' ... surface density [kg/m^2]
-            'ewh' ... equivalent water height [m]
-            'ewhGRACE' ... equivalent water height [m], but with lmax=120 and
-                           filtered
-        'gravity'... [m/s^2]
+    Returns
+    -------
+    flm: pyshtools.SHCoeffs
+        the transformed coefficients
+    
+    Possible units
+    --------------
+    'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+        'U' ... geopotential [m^2/s^2]
+        'N' ... geoid height [m]
+        'GRACE' ... geoid height [m], but with lmax=120 and filtered
+    'ff' ... fractional frequency [-]
+    'h' .... elevation [m]
+    'mass' ... dimensionless surface loading coeffs
+        'sd' ... surface density [kg/m^2]
+        'ewh' ... equivalent water height [m]
+        'ewhGRACE' ... equivalent water height [m], but with lmax=120 and
+                       filtered
+    'gravity'... [m/s^2]
     """
     
     # np.random.seed(7)
@@ -71,7 +80,6 @@ def sh2sh(f_lm, From, To, lmax=False):
     with open(cfg.PATHS['lln_path'] + '/lln.json') as f:
         lln = np.array(json.load(f))
     lln_k1 = lln[0:lmax+1,3] + 1
-    # lln_k1_atmo = lln[0:lmax+1,3] - 1  # because atm. mass lowers surface potential --> relic from a wrong belief that Voigt et al (2016) were kind of right...
     lln_h = lln[0:lmax+1,1]
     
     if From in('pot', 'U', 'N'): 
@@ -84,13 +92,6 @@ def sh2sh(f_lm, From, To, lmax=False):
             f_lm = f_lm * c**2 * R / GM
              
         if To in('pot', 'U', 'N', 'GRACE'):
-            # if atmo:  # in case the masses are above the clock...
-                # lln_k1[1] = 0.02601378180 + 1  # from CM to CF
-                # lln_k1_atmo[1] = 0.02601378180 - 1  # from CM to CF
-                
-                # f_lm = f_lm.to_array() * lln_k1_atmo.reshape(lmax+1,1) \
-                #     / lln_k1.reshape(lmax+1,1)
-                # f_lm = sh.SHCoeffs.from_array(f_lm)
         # Then: Into the desired format (unless it's 'pot')
             if To == 'U':
                 f_lm = f_lm * GM / R
@@ -183,7 +184,6 @@ def sh2sh(f_lm, From, To, lmax=False):
             elif To == 'N':
                 f_lm = f_lm * R
             elif To == 'GRACE':
-#TODO: this is probs wrong; filter first, then convert to ewh!
                 f_lm = ddk(sh.SHCoeffs.from_array(f_lm).pad(120) * R, 3)
                 # filename = '/home/schroeder/CLONETS/data/ITSG-2018_n120_2007mean_sigma.nc'
                 # sigma = shcoeffs_from_netcdf(filename)
@@ -250,7 +250,31 @@ def sh2sh(f_lm, From, To, lmax=False):
         return f_lm
     
 def Sigma_xx_2points_from_formal(sigma, lon1, lat1, lon2, lat2, lmax=False, gaussian=False):
-    """Computes 2-point Covariance matrix from GRACE formal errors."""
+    """Computes 2-point Covariance matrix from GRACE errors.
+    
+    Parameters
+    ----------
+    sigma: sh.SHCoeffs
+        Errors of spherical harmonic coefficients
+    lon1: float
+        Longitude of first point
+    lat1: float
+        Latitude of first point
+    lon2: float
+        Longitude of second point
+    lat2: float
+        Latitude of second point
+    lmax: int, optional
+        maximum spherical harmonic degree of the returned coefficients, 
+        constructed either by cutting or zeropadding
+    gaussian: float, optional
+        radius of the gaussian kernel, if a gaussian smoothing shall be applied
+        
+    Returns
+    -------
+    sigma_deltaN: np.array of floats [2x2]
+        Covariance matrix of the two input points
+    """
     
     if lmax:
         sigma = sigma.pad(lmax)
@@ -311,14 +335,18 @@ def Sigma_xx_2points_from_formal(sigma, lon1, lat1, lon2, lat2, lmax=False, gaus
 def shcoeffs2netcdf(filename, coeffs, unit='', description=''):
     """Store a pyshtools.SHCoeffs instance into a netcdf file.
     
-    :param filename: name of the saved file
-    :type filename: str
-    :param coeffs: the pyshtools.SHCoeffs instance
-    :type coeffs: pyshtools.SHCoeffs
-    :param unit: unit of the coeffs
-    :type unit: str
-    :param description: description of the data
-    :type description: str
+    DEPRECATED: This implementation is now part of pyshtools.
+    
+    Parameters
+    ----------
+    filename: str
+        name of the saved file
+    coeffs: sh.SHCoeffs
+        the spherical harmonic coefficients
+    unit: str, optional
+        unit of the coefficients
+    description: str, optional
+        description of the data
     """
     
     if not filename[-3:] == '.nc':
@@ -346,10 +374,17 @@ def shcoeffs_from_netcdf(filename):
     triangular matrix and s as upper triangular matrix as done with the function
     shcoeffs2netcdf.
     
-    :param filename: the name of the netcdf file
-    :type filename: str
-    :rparam: the spherical harmonic coefficients
-    :rtype: pyshtools.SHCoeffs
+    DEPRECATED: This implementation is now part of pyshtools.
+    
+    Parameters
+    ----------
+    filename: str
+        name of the netcdf file to load
+        
+    Returns
+    -------
+    coeffs: sh.SHCoeffs
+        the spherical harmonic coefficients
     """
     
     if not filename[-3:] == '.nc':
@@ -372,14 +407,20 @@ def read_SHCoeffs_errors(path, headerlines, k=True):
     dictionary with pyshtools.SHCoeffs objects for the coefficients and their
     sigmas.
     
-    :type path: str
-    :param path: path to the ascii file
-    :type headerlines: int
-    :param headerlines: number of header lines
-    :type k: bool
-    :param k: Is the first column a key?
-    :rtype: dict with pyshtools.SHCoeffs
-    :rparam: coeffs, sigma are the keys. The SHCoeffs are the variables
+    Parameters
+    ----------
+    path: str
+        path to the ascii file
+    headerlines: int
+        number of header lines
+    k: bool, optional
+        is the first column a key?
+    
+    Returns
+    -------
+    dictionary of sh.SHCoeffs
+        'coeffs" and 'sigma' as keys, the spherical harmonic coefficiens as
+        variables
     """
     
     with open(path) as f:
@@ -416,12 +457,24 @@ def read_SHCoeffs(path, headerlines, k=True, lastline=False, D=False):
     
     The columns have to be key, L, M, C, S. Returns pyshtools.SHCoeffs object.
     
-    :type path: str
-    :param path: path to the ascii file
-    :type headerlines: int
-    :param headerlines: number of header lines
-    :rtype: pyshtools.SHCoeffs
-    :rparam: The SHCoeffs, size [2, N+1, N+1]
+    Parameters
+    ----------
+    path: str
+        path to the ascii file
+    headerlines: int
+        number of header lines
+    k: bool, optional
+        is the first column a key?
+    lastline: bool, optional
+        set True in case there is an empty last line in the file
+    D: bool, optional
+        set True in case the letter D is used instead of E for scientific
+        number writing
+    
+    Returns
+    -------
+    pyshtools.SHCoeffs
+        The spherical harmonic coefficients, size [2, N+1, N+1]
     """
     
     with open(path) as f:
@@ -455,7 +508,18 @@ def read_SHCoeffs(path, headerlines, k=True, lastline=False, D=False):
     return sh.SHCoeffs.from_array(np.transpose(np.dstack((c, s)), (2, 0, 1)))
 
 def disc_autocovariance(x):
-    """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'."""
+    """Discrete autocovariance function after (9.7) in 'Zeitreihenanalyse'.
+    
+    Parameters
+    ----------
+    x: np.array of floats
+        a time series
+        
+    Returns
+    -------
+    C: np.arry of floats
+        the corresponding discrete autocovariance function
+    """
     n = len(x)
     m = n# int(n/10)
     C = np.zeros(m+1)
@@ -477,7 +541,20 @@ def disc_autocovariance(x):
 #             Q[i, ]
     
 def autocovariance_fct2neff(C, m=False):
-    """Returns effective measurement number from autocovariance function."""
+    """Returns effective measurement number from autocovariance function.
+    
+    Parameters
+    -------
+    C: np.arry of floats
+        a discrete autocovariance function
+    m: int, optional
+        number of entries of C to analyze, usually 1/10 of all entries
+        
+    Returns
+    -------
+    neff: float
+        number of effective measurements
+    """
     n = len(C)
     if m == False:
         m = int(n/10)
@@ -493,6 +570,20 @@ def autocovariance_fct2neff(C, m=False):
 def amplitude_spectrum(C, dt):
     """Amplitude spectrum = Scaled fourier transform of the discrete
     autocovariance function (power spectrum) after (9.52).
+    
+    Parameters
+    -------
+    C: np.arry of floats
+        a discrete autocovariance function
+    dt: float
+        time between measurements
+        
+    Returns
+    -------
+    v: np.array of floats
+        frequency stamps
+    A: np.array of floats
+        amplitude spectrum
     """
     
     def hamming(j, m):
@@ -511,7 +602,24 @@ def amplitude_spectrum(C, dt):
     return v, A
 
 def read_cov(filename, lmax, d0=False, d1=False):
-    """Read in spherical harmonic coefficients' covariance matrix."""
+    """Read in spherical harmonic coefficients' covariance matrix.
+    
+    Parameters
+    -------
+    filename: str
+        path+name of the file to load
+    lmax: int
+        maximum spherical harmonic degree to load in
+    d0: bool, optional
+        set True if degree 0 is to be included
+    d1: bool, optional
+        set True if degree 1 is to be included
+    
+    Returns
+    -------
+    C: np.array of floats 
+        Covariance matrix        
+    """
     
     dim = (lmax+1)**2 - 4
     if d0:
@@ -532,7 +640,26 @@ def read_cov(filename, lmax, d0=False, d1=False):
     return C
 
 def variances_from_cov(C, lmax, order='order', d0=False, d1=False):
-    """Get the variances from the covariance matrix."""
+    """Get the variances from the covariance matrix.
+    
+    Parameters
+    -------
+    C: np.array of floats
+        Covariance matrix
+    lmax: int
+        maximum spherical harmonic degree to read out of C
+    order: str, optional
+        'order' or 'degree' depending on arrangement of coefficients
+    d0: bool, optional
+        set True if degree 0 is included in C
+    d1: bool, optional
+        set True if degree 1 is included in C
+    
+    Returns
+    -------
+    v: sh.SHCoeffs
+        variances of the spherical harmonic coefficients     
+    """
     
     Cd = np.diag(C)
     var = sh.SHCoeffs.from_zeros(lmax)
@@ -551,10 +678,17 @@ def variances_from_cov(C, lmax, order='order', d0=False, d1=False):
 def degree_variances_from_variances(var, To='pot'):
     """Converts spherical harmonic coefficients to degree variances.
     
-    :param var: variance coefficients
-    :type var: pyshtools.SHCoeffs
-    :param To: output unit
-    :type To: str
+    Parameters
+    -------
+    var: sh.SHCoeffs
+        variances of spherical harmonic coefficients
+    To: str, optional
+        output unit, either 'pot' or 'N'
+        
+    Returns
+    -------
+    kappa: np.array of floats
+        degree variances
     """
     
     try:
@@ -573,14 +707,21 @@ def degree_variances_from_variances(var, To='pot'):
 def degree_amplitudes_from_degree_variances(kappa, From, To, cumulative=False):
     """Converts degree variances to (cumulative) degree amplitudes.
     
-    :param kappa: degree variances
-    :type kappa: np.array of floats
-    :param From: unit of the variances
-    :type From: str
-    :param To: unit of the amplitudes
-    :type To: str
-    :param cumulative: cumulative degree variances or not
-    :type cumulative: boolean
+    Parameters
+    -------
+    kappa: np.array of floats
+        degree variances
+    From: str
+        input unit
+    To: str
+        output unit
+    cumulative: bool
+        set True for cumulative degree amplitudes as output
+        
+    Returns
+    -------
+    sigma: np.array of floats
+        degree amplitudes    
     """
     
     N = len(kappa)
@@ -617,14 +758,19 @@ def degree_amplitudes_from_degree_variances(kappa, From, To, cumulative=False):
 def time2freq(delta_t, signal):
     """Uses scipy's fftpack.fft to Fourier-transform the timeseries.
     
-    :param delta_t: measurement sampling rate [s]
-    :type delta_t: float
-    :param signal: the signal
-    :type signal: numpy.array of floats
-    :rparam f: frequency vector [Hz]
-    :rtype f: numpy.array of floats
-    :rparam freq: absolute values of the amplitudes
-    :rtype freq: numpy.array of floats
+    Parameters
+    -------
+    delta_t: float
+        time between measurements
+    signal: np.array of floats
+        signal time series
+    
+    Returns
+    -------
+    f: np.array of floats
+        frequency vector [Hz]
+    freq: np.array of floats
+        absolute values of the amplitudes
     """
     
     count = len(signal)
@@ -641,7 +787,21 @@ def sh_nm2i(n, m, nmax):
     I = [0
          1, 4
          2, 5, 7
-         3, 6, 8, 9]]
+         3, 6, 8, 9]
+    
+    Parameters
+    ----------
+    n: int
+        degree
+    m: int
+        order
+    nmax: int
+        maximum degree
+        
+    Returns
+    -------
+    int
+        index of the spherical harmonic degree and order
     """
     
     if m > n:
@@ -652,6 +812,17 @@ def sh_mat2vec(NM):
     """Converts a triangular matrix into a vector with the lower half.
     
     See sh_nm2i for the indices.
+    
+    Parameters
+    ----------
+    NM: np.array of floats
+        triangular matrix
+    
+    Returns
+    -------
+    v: np.array of floats
+        vector composed of the lower half of the input matrix, for indices see
+        'sh_nm2i()'
     """
     N = len(NM)-1
     v = np.zeros(sh_nm2i(N, N, N)+1)
@@ -660,25 +831,51 @@ def sh_mat2vec(NM):
             v[sh_nm2i(n, m, N)] = NM[n][m]
     return v
 
-def sh_vec2mat(v, N):
+def sh_vec2mat(v, lmax):
     """Converts a vector to a triangular matrix.
     
     See sh_nm2i for the indices.
+    
+    Parameters
+    ----------
+    v: np.array of floats
+        vector composed of the spherical harmonic coefficients, for indices see
+        'sh_nm2i()'
+    lmax: int
+        maximum spherical harmonic degree
+        
+    Returns
+    -------
+    NM: np.array of floats
+        triangular matrix of spherical harmonic coefficients
     """
     
-    NM = np.zeros((N+1, N+1))
-    for n in range(N+1):
+    NM = np.zeros((lmax+1, lmax+1))
+    for n in range(lmax+1):
         for m in range(n+1):
-            NM[n][m] = v[sh_nm2i(n, m, N)]
+            NM[n][m] = v[sh_nm2i(n, m, lmax)]
     return NM
 
-def W_l(N, r):
-    '''A generator for W from Wahr et al. (1998).'''
+def W_l(lmax, r):
+    '''A generator for W from Wahr et al. (1998).
+    
+    Parameters
+    ----------
+    lmax: int
+        maximum spherical harmonic degree
+    r: float
+        radius of the gaussian kernel
+    
+    Returns
+    -------
+    W: generator
+        generator for an np.array
+    '''
     
     R = sh.constant.r3_wgs84.value / 1000  # [km]
     b = np.log(2) / (1-np.cos(r/R))
     l = 0
-    while l < N+1:
+    while l < lmax+1:
         if l == 0:
             W = 1 #/ 2 / np.pi
         elif l == 1:
@@ -694,28 +891,38 @@ def gauss_filter(f_lm, r=350):
     
     A simple filter after Wahr et al. (1998).
     
-    :type f_lm: pyshtools.SHCoeffs
-    :param f_lm: The SHCoeffs, size [2, N+1, N+1]
-    :type r: float, optional
-    :param r: Filter radius in km
-    :rtype: pyshtools.SHCoeffs
-    :rparam: The filtered SHCoeffs, size [2, N+1, N+1]
+    Parameters
+    ----------
+    lmax: int
+        maximum spherical harmonic degree
+    r: float, optional
+        radius of the gaussian kernel
+        
+    Returns
+    -------
+    pyshtools.SHCoeffs
+        The filtered SHCoeffs [2, lmax+1, lmax+1]
     """
-    
-        # das hier macht zwar keinen generator, aber ist iwie falsch...
-        # W = np.zeros(N)
-        # W[0] = 1 / 2 / np.pi
-        # W[1] = W[0] * ((1+np.e**(-2*b))/(1-np.e**(-2*b)) - 1/b)
-        # for l in range(2, N):
-        #     W[l] =  W[l-1] * (-(2*l + 1)/b) + W[l-2]
-        # return W        
     
     W = np.array([w for w in W_l(f_lm.lmax, r)])
     f_lm = f_lm.coeffs * W.reshape(1, len(W), 1)
     return sh.SHCoeffs.from_array(f_lm)
 
 def ddk(coeffs, x):
-    """Function for an easier call of the right filter."""
+    """Function for an easier call of the right filter.
+    
+    Parameters
+    ----------
+    coeffs: sh.SHCoeffs
+        spherical harmonic coefficients to be filtered
+    x: int (1-8)
+        number of DDK filter
+        
+    Returns
+    -------
+    coeffs_filtered: sh.SHCoeffs
+        filtered spherical harmonic coefficients
+    """
     
     if x == 1:
         DDK = DDKfilter(cfg.PATHS['lln_path'] + '/DDK/Wbd_2-120.a_1d14p_4');
