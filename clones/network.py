@@ -300,6 +300,7 @@ class Clock():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -432,6 +433,7 @@ class Clock():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -498,8 +500,10 @@ class Clock():
         
         return T_date, series, series_upper, series_lower
      
-    def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-                       reset=False, error=False, sigma=False, save=False):
+    # def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
+    #                    reset=False, error=False, sigma=False, save=False):
+    def plotTimeseries(self, T, esc, unitFrom, unitTo, sigma=False, save=False,
+                       **kwargs):
         """Plots time series at clock location.
         
         Uses sh2timeseries() and plots the resulting time series at clock
@@ -537,6 +541,7 @@ class Clock():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -555,8 +560,7 @@ class Clock():
             if isinstance(esc, list):
                 for e in esc:
                     T, data, noise = self.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        error=error, sigma=sigma)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     if unitTo in('N', 'h', 'GRACE'):
                         data = [i * 1e3 for i in data]
                         noise = [i * 1e3 for i in noise] # noise muss arrays sein in der liste
@@ -566,8 +570,7 @@ class Clock():
                                  label='noise scenario ' + str(i+1))
             else:
                 T, data, noise = self.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    error=error, sigma=sigma)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = [i * 1e3 for i in data]
                     noise = [i * 1e3 for i in noise]
@@ -585,14 +588,14 @@ class Clock():
         else:
             if isinstance(esc, list):
                 for e in esc:
-                    T, data = self.sh2timeseries(T, e, unitFrom, unitTo,
-                                                 t_ref=t_ref, reset=reset)
+                    T, data = self.sh2timeseries(
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     if unitTo in('N', 'h', 'GRACE'):
                         data = [i * 1e3 for i in data]
                     plt.plot(T, data, label=e)
             else:
-                T, data = self.sh2timeseries(T, esc, unitFrom, unitTo,
-                                             t_ref=t_ref, reset=reset)
+                T, data = self.sh2timeseries(
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = [i * 1e3 for i in data]
                 plt.plot(T, data, label=esc)
@@ -604,9 +607,10 @@ class Clock():
         plt.legend()
         plt.tight_layout()
         
-        for i, noi in enumerate(noise):
-            np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
-                    unitTo + '_' + self.location + '_noise' + str(i), data+noi)
+        if sigma:
+            for i, noi in enumerate(noise):
+                np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc + '_' +
+                        unitTo + '_' + self.location + '_noise' + str(i), data+noi)
         
         if save:
             path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
@@ -614,9 +618,11 @@ class Clock():
             plt.savefig(path)
             #TODO: case for esc is list
     
-    def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
-                            fmax=False, t_ref=False, reset=False, error=False,
-                            sigma=False, filt=False, save=False):
+    # def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
+    #                         fmax=False, t_ref=False, reset=False, error=False,
+    #                         sigma=False, filt=False, save=False):
+    def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t, 
+                            sigma=False, fmax=False, save=False, **kwargs):
         """Plots time series in frequency domain at clock location.
         
         Uses sh2timeseries() and plots the resulting time series in frequency
@@ -660,6 +666,7 @@ class Clock():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -676,76 +683,34 @@ class Clock():
         ax.xaxis.set_major_locator(MaxNLocator(integer=True))
         
         if sigma:
-            if type(esc) is list:  # DEPRECATED!
-                for e in esc:
-                    T, data, noise = self.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        error=error, sigma=sigma, filt=filt)
-                    f, freq = harmony.time2freq(delta_t, data)
-                    # f, noisy_freq = harmony.time2freq(delta_t, data+noise)
-                    noise_level = []
-                    for noi in noise:
-                        fn, noisy = harmony.time2freq(delta_t, noi)
-                        noise_level.append(np.mean(noisy) * np.ones(len(f)))
-                    if fmax:
-                        f, freq, noise_level = (f[:fmax], freq[:fmax],
-                                                [n[:fmax] for n
-                                                 in noise_level])
-                    # plt.plot(f*86400*365, noisy_freq, 'x', label=e+' + noise',
-                    #          color=p[0].get_color())
-                    for lvl, sig in zip(noise_level, sigma):
-                        plt.plot(f*86400*365, lvl,
-                                 label='noise level for $\sigma$='+str(sig))
-                    p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
-            else:
-                # T, data, noise = self.sh2timeseries(
-                #     T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                #     error=error, sigma=sigma, filt=filt)
-                # f, freq = harmony.time2freq(delta_t, data)
-                # # f, noisy_freq = harmony.time2freq(delta_t, data+noise)
-                # noise_level = []
-                # for noi in noise:
-                #     fn, noisy = harmony.time2freq(delta_t, noi)
-                #     noise_level.append(np.mean(noisy) * np.ones(len(f)))
-                # if fmax:
-                #     f, freq, noise_level = (f[:fmax], freq[:fmax],
-                #                             [n[:fmax] for n in noise_level])
-                # # plt.plot(f*86400*365, noisy_freq, 'x', label=e+' + noise',
-                # #          color=p[0].get_color())
-                # for lvl, sig in zip(noise_level, sigma):
-                #     plt.plot(f*86400*365, lvl,
-                #              label='noise level for $\sigma$='+str(sig))
-                # p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
-                T, data = self.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
-                f, freq = harmony.time2freq(delta_t, data)
-                if fmax:
-                    f, freq = f[:fmax], freq[:fmax]
-                noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
-                plt.plot(f[1:]*86400*365, noise[0, :], '--', color='black',
-                         label='noise levels')
-                plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
-                plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
-                plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
+            T, data = self.sh2timeseries(
+                T, esc, unitFrom, unitTo, **kwargs)
+            f, freq = harmony.time2freq(delta_t, data)
+            noise = np.load('/home/schroeder/CLONETS/data/noise.npy')
+            if fmax:
+                f, freq, noise = f[:fmax], freq[:fmax], noise[:, :fmax-1]
                 
-                np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc +
-                        '_freq_' + self.location, freq[1:])
-                np.save(cfg.PATHS['data_path'] + 'ts_results/x_freq', f[1:]*86400*365)
+            plt.plot(f[1:]*86400*365, noise[0, :], '--', color='black',
+                     label='noise levels')
+            plt.plot(f[1:]*86400*365, noise[1, :], '--', color='black')
+            plt.plot(f[1:]*86400*365, noise[2, :], '--', color='black')
+            plt.plot(f[1:]*86400*365, freq[1:], '.-', label=esc)
+            
+            np.save(cfg.PATHS['data_path'] + 'ts_results/' + esc +
+                    '_freq_' + self.location, freq[1:])
+            np.save(cfg.PATHS['data_path'] + 'ts_results/x_freq', f[1:]*86400*365)
         else:
             if type(esc) is list:
                 for e in esc:
                     T, data = self.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt)
+                        T, e, unitFrom, unitTo, **kwargs)
                     f, freq = harmony.time2freq(delta_t, data)
                     if fmax:
                         f, freq = f[:fmax], freq[:fmax]
                     plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
                 T, data = self.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
+                    T, esc, unitFrom, unitTo, **kwargs)
                 f, freq = harmony.time2freq(delta_t, data)
                 if fmax:
                     f, freq = f[:fmax], freq[:fmax]
@@ -805,6 +770,7 @@ class Clock():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
         """
         
         esc_dict = {'I': 'oggm_',
@@ -1027,9 +993,11 @@ class Link():
         
         return power
             
-    def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-                       reset=False, error=False, sigma=False, filt=False,
-                       lmax=False, save=False, vmin=False, vmax=False):
+    # def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
+    #                    reset=False, error=False, sigma=False, filt=False,
+    #                    lmax=False, save=False, vmin=False, vmax=False):
+    def plotTimeseries(self, T, esc, unitFrom, unitTo, sigma=False, vmin=False,
+                       vmax=False, save=False, **kwargs):
         """Plots the differential time series.
         
         Uses sh2timeseries() for both clocks and plots the resulting
@@ -1063,6 +1031,7 @@ class Link():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -1081,11 +1050,9 @@ class Link():
             if type(esc) is list:
                 for e in esc:
                     T_a, data_a, noise_a = self.a.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt, error=error, sigma=sigma)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     T_b, data_b, noise_b = self.b.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt, error=error, sigma=sigma)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     data_a, data_b = np.array(data_a), np.array(data_b)
                     data = data_b - data_a
                     noise = [a + b for a, b in zip(noise_a, noise_b)]
@@ -1099,11 +1066,9 @@ class Link():
                     plt.plot(T, data, label=e)
             else:
                 T_a, data_a, noise_a = self.a.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt, error=error, sigma=sigma)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 T_b, data_b, noise_b = self.b.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt, error=error, sigma=sigma)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 data_a, data_b = np.array(data_a), np.array(data_b)
                 data = data_b - data_a
                 noise = [a + b for a, b in zip(noise_a, noise_b)]
@@ -1126,24 +1091,20 @@ class Link():
         else:
             if type(esc) is list:
                 for e in esc:
-                    T_a, data_a = self.a.sh2timeseries(T, e, unitFrom, unitTo,
-                                                       t_ref=t_ref, reset=reset,
-                                                       filt=filt, lmax=lmax)
-                    T_b, data_b = self.b.sh2timeseries(T, e, unitFrom, unitTo,
-                                                       t_ref=t_ref, reset=reset,
-                                                       filt=filt, lmax=lmax)
+                    T_a, data_a = self.a.sh2timeseries(
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
+                    T_b, data_b = self.b.sh2timeseries(
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     data_a, data_b = np.array(data_a), np.array(data_b)
                     if unitTo in('N', 'h', 'GRACE'):
                         data_a = data_a * 1e3
                         data_b = data_b * 1e3
                     plt.plot(T, data_b-data_a, label=e)
             else:
-                T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                   t_ref=t_ref, reset=reset,
-                                                   filt=filt, lmax=lmax)
-                T_b, data_b = self.b.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                   t_ref=t_ref, reset=reset,
-                                                   filt=filt, lmax=lmax)
+                T_a, data_a = self.a.sh2timeseries(
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
+                T_b, data_b = self.b.sh2timeseries(
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 data_a, data_b = np.array(data_a), np.array(data_b)
                 if unitTo in('N', 'h', 'GRACE'):
                         data_a = data_a * 1e3
@@ -1175,10 +1136,9 @@ class Link():
         
         return data_b-data_a
     
-    def plotTimeseriesIncrements(self, T, esc, unitFrom, unitTo, t_ref=False,
-                                 reset=False, error=False, sigma=False,
-                                 filt=False, lmax=False, save=False, vmin=False,
-                                 vmax=False):
+    
+    def plotTimeSeriesIncrements(self, T, esc, unitFrom, unitTo, vmin=False,
+                                 vmax=False, save=False, **kwargs):
         """."""
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -1191,12 +1151,8 @@ class Link():
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
         
-        T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
-                                           t_ref=t_ref, reset=reset,
-                                           filt=filt, lmax=lmax)
-        T_b, data_b = self.b.sh2timeseries(T, esc, unitFrom, unitTo,
-                                           t_ref=t_ref, reset=reset,
-                                           filt=filt, lmax=lmax)
+        T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo, **kwargs)
+        T_b, data_b = self.b.sh2timeseries(T, esc, unitFrom, unitTo, **kwargs)
         data_a, data_b = np.array(data_a), np.array(data_b)
         if unitTo in('N', 'h', 'GRACE'):
                 data_a = data_a * 1e3
@@ -1219,12 +1175,12 @@ class Link():
             path = (cfg.PATHS['fig_path'] + 'timeseries/' + esc + '_' + unitTo
                     + '_' + self.a.location 
                     + '_' + self.b.location + '_' + f'{i+1:02}' + '.png')
-            plt.savefig(path, dpi=300)
+            if save: 
+                plt.savefig(path, dpi=300)
             plt.show()
         
     def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
-                            fmax=False, t_ref=False, reset=False, error=False,
-                            sigma=False, filt=False, save=False):
+                            fmax=False, sigma=False, save=False, **kwargs):
         """Plots time series in frequency domain at clock location.
         
         Uses sh2timeseries() and plots the resulting time series in frequency
@@ -1268,6 +1224,7 @@ class Link():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
 
@@ -1288,11 +1245,9 @@ class Link():
             if type(esc) is list:
                 for e in esc:
                     T_a, data_a, noise_a = self.a.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt, error=error, sigma=sigma)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     T_b, data_b, noise_b = self.b.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt, error=error, sigma=sigma)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     data_a, data_b = np.array(data_a), np.array(data_b)
                     data = data_b - data_a
                     noise = np.array(noise_a) + np.array(noise_b)
@@ -1316,11 +1271,9 @@ class Link():
                     p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
                 T_a, data_a = self.a.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 T_b, data_b = self.b.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
+                   T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 data_a, data_b = np.array(data_a), np.array(data_b)
                 data = data_b - data_a
                 f, freq = harmony.time2freq(delta_t, data)
@@ -1342,11 +1295,9 @@ class Link():
             if type(esc) is list:
                 for e in esc:
                     T_a, data_a = self.a.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     T_b, data_b = self.b.sh2timeseries(
-                        T, e, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                        filt=filt)
+                        T, e, unitFrom, unitTo, sigma=sigma, **kwargs)
                     data_a, data_b = np.array(data_a), np.array(data_b)
                     data = data_b - data_a
                     f, freq = harmony.time2freq(delta_t, data)
@@ -1355,11 +1306,9 @@ class Link():
                     p = plt.plot(f[1:]*86400*365, freq[1:], '.-', label=e)
             else:
                 T_a, data_a = self.a.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 T_b, data_b = self.b.sh2timeseries(
-                    T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    filt=filt)
+                    T, esc, unitFrom, unitTo, sigma=sigma, **kwargs)
                 data_a, data_b = np.array(data_a), np.array(data_b)
                 data = data_b - data_a
                 f, freq = harmony.time2freq(delta_t, data)
@@ -1757,42 +1706,6 @@ class Network():
         
         lons = [clo.lon for clo in self.clocks]
         return np.array(lons)
-    
-    def _sh2timeseries(self, F_lm, t, kind, unit, unitTo=[]):
-        """Expand spherical harmonics into timeseries at each clock location.
-        
-        DEPRECATED!
-        
-        :param F_lm: spherical harmonic coefficients
-        :type F_lm: list of pyshtools.SHCoeffs
-        :param t: time vector of decimal years
-        :type t: numpy.array
-        :param kind: origin of the mass redistribution
-        :type kind: str
-        :param unit: the input unit of the coefficients
-        :type unit: str
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' .... elevation [m]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            
-        Possible kinds:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
-            'S' ... Solid Earth            
-        """
-        
-        for clo in self.clocks:
-            clo.sh2timeseries(F_lm, t, kind, unit, unitTo=unitTo)
             
     def h_N_2ff(self, effect_names):
         """Convert elevation and geoid change to ff change for all clocks."""
@@ -1939,7 +1852,7 @@ class Network():
         return fig
     
     def plotESC(self, esc, t, unitFrom, unitTo, t_ref=None, save=False,
-                degreevariances=False, relief=False, lmin=False, lmax=False,
+                degreevariances=False, lmin=False, lmax=False,
                 world=False):
         """Plots the earth system component signal on a map.
         
@@ -1970,8 +1883,10 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
+#TODO: region not hardcoded but as parameter, possibly kwarg for plot_europe_720()
         
         cb_dict = {'U': '"gravitational potential [m@+2@+/s@+2@+]"',
                      'N': '"Geoid height [mm]"',
@@ -2089,6 +2004,7 @@ class Network():
             'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
+        #TODO: region not hardcoded but as parameter
         
         cb_dict = {'U': '"gravitational potential [m@+2@+/s@+2@+]"',
                      'N': '"Geoid height [mm]"',
@@ -2238,6 +2154,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -2380,7 +2297,7 @@ class Network():
     
     def plotRMS2(self, T, esc, unitFrom, unitTo, reset=False, save=False,
                 trend=None):
-        """Plots the Root Mean Square on a map.
+        """Plots the Root Mean Square on a map. Used for the "famous" picture.
         
         Expands the spherical harmonics from the data folder for each grid
         point and each time step. Then computes the root mean square error for
@@ -2427,6 +2344,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -2583,7 +2501,7 @@ class Network():
         return fig, grid
     
     def plotRMSatClocks(self, T, esc, unitFrom, unitTo, reset=False,
-                        save=False, trend=None, sigma=False):
+                        save=False, trend=None):
         """Plots the Root Mean Square on a map.
         
         Expands the spherical harmonics from the data folder for each grid
@@ -2630,6 +2548,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -2767,9 +2686,8 @@ class Network():
         ax.legend()
         plt.tight_layout()
         
-    def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-                       reset=False, loc=False, loc_ref=False, lmin=False,
-                       lmax=False):
+    def plotTimeseries(self, T, esc, unitFrom, unitTo, loc=False, loc_ref=False,
+                       save=False, **kwargs):
         """Plots time series at each clock location.
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
@@ -2802,6 +2720,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -2822,8 +2741,7 @@ class Network():
             next(ax._get_lines.prop_cycler)
             clo = self.search_clock('location', loc_ref)[0]
             T_ref, data_ref = clo.sh2timeseries(
-                T, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset, lmin=lmin,
-                lmax=lmax)
+                T, esc, unitFrom, unitTo, **kwargs)
             data_ref = np.array(data_ref)
             if unitTo in('N', 'h', 'GRACE'):
                 data_ref = data_ref * 1e3
@@ -2831,8 +2749,7 @@ class Network():
         for number, clo in enumerate(self.clocks):
             if (loc and clo.location in loc) or loc==False:
                 T, data = clo.sh2timeseries(
-                    T_str, esc, unitFrom, unitTo, t_ref=t_ref, reset=reset,
-                    lmin=lmin, lmax=lmax)
+                    T_str, esc, unitFrom, unitTo, **kwargs)
                 data = np.array(data)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = data * 1e3
@@ -2874,13 +2791,13 @@ class Network():
         
         
         path = (cfg.PATHS['fig_path'] + 'timeseries/partofnetwork.pdf')
-        plt.savefig(path)
+        if save:
+            plt.savefig(path)
         
         return fig
     
-    def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
-                            fmax=False,  t_ref=False, loc=False,
-                            loc_ref=False, save=False, lmin=False, lmax=False):
+    def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t, loc=False,
+                            loc_ref=False, fmax=False, save=False, **kwargs):
         """Plots the spectral domain of the time series at clock location.
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
@@ -2913,6 +2830,7 @@ class Network():
             'I' ... Ice
             'H' ... Hydrology
             'A' ... Atmosphere
+            'O' ... Ocean
             'GIA'.. Glacial Isostatic Adjustment
         """
         
@@ -2931,17 +2849,16 @@ class Network():
         if loc_ref:
             next(ax._get_lines.prop_cycler)
             clo = self.search_clock('location', loc_ref)[0]
-            T_ref, data_ref = clo.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                t_ref=t_ref, lmin=lmin,
-                                                lmax=lmax)
+            T_ref, data_ref = clo.sh2timeseries(
+                T, esc, unitFrom, unitTo, **kwargs)
             data_ref = np.array(data_ref)
             if unitTo in('N', 'h', 'GRACE'):
                 data_ref = data_ref * 1e3
         
         for number, clo in enumerate(self.clocks):
             if (loc and clo.location in loc) or loc==False:
-                T, data = clo.sh2timeseries(T_str, esc, unitFrom, unitTo,
-                                            t_ref=t_ref, lmin=lmin, lmax=lmax)
+                T, data = clo.sh2timeseries(
+                    T_str, esc, unitFrom, unitTo, **kwargs)
                 data = np.array(data)
                 if unitTo in('N', 'h', 'GRACE'):
                     data = data * 1e3
@@ -3162,6 +3079,7 @@ class Network():
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
                         inp_func, t):
+#TODO: region as parameter
         
         x = grid.lons()
         y = grid.lats()

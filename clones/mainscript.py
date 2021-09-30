@@ -63,8 +63,8 @@ T = [t0 + datetime.timedelta(d) for d in range(0, 365)]
 t_ref = '2007'
 
 # # Monthly string timeseries ---------------------------------------------------
-t_ref = '2006'
-T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
+# t_ref = '2006'
+# T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
 
 # # Monthly string timeseries 3 years -------------------------------------------
 # months = ['%02d' % (i) for i in range(1, 13)] * 3
@@ -77,46 +77,9 @@ T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
 # Plot clock timeseries -------------------------------------------------------
 sigma = [1e-18, 1e-19, 1e-20]
 unitTo = 'N'
-# bern.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma, save=True)
-# bern.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20, t_ref=t_ref,
-#                           sigma=sigma,
-#                           save=True)
-# strasbourg.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=True)
-# strasbourg.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20,
-#                                 t_ref=t_ref, sigma=sigma,
-#                                 save=True)
-# torino.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                       save=True)
-# torino.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20, t_ref=t_ref,
-#                             sigma=sigma,
-#                             save=True)
-# braunschweig.plotTimeseries(T, 'A', 'pot', 'ewh', t_ref=t_ref, sigma=sigma,
-#                             save=False)
-# braunschweig.plotTimeseries(T, 'A', 'pot', 'N', t_ref=t_ref, sigma=sigma,
-#                             save=False)
-# braunschweig.plotTimeseries(T, 'A', 'pot', 'h', t_ref=t_ref, sigma=sigma,
-#                             save=False)
-# braunschweig.plotTimeseries(T, 'A', 'pot', 'ff', t_ref=t_ref, sigma=sigma,
-#                             save=True)
-# braunschweig.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400,
-#                                   t_ref=t_ref, sigma=sigma, save=False)
-# braunschweig.plotTimeseries(T, 'A', 'pot', 'ff', t_ref=t_ref, sigma=2,
-#                             save=False)
-# braunschweig.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400,
-#                                   t_ref=t_ref, sigma=sigma, save=True)
-# gothenburg.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=True)
-# gothenburg.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20,
-#                                 t_ref=t_ref, sigma=sigma, save=True)
-# helsinki.plotTimeseries(T, 'A', 'pot', 'ewh', t_ref=t_ref, sigma=sigma,
-#                         save=False)
-# helsinki.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20,
-#                               t_ref=t_ref, sigma=sigma, save=True)
-# london.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                       save=True)
-# london.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20,
-#                             t_ref=t_ref, sigma=sigma, save=True)
+# bern.plotTimeseries(T, 'H', 'ewh', unitTo, sigma=False, save=False, t_ref=t_ref)
+# bern.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20, 
+#                           sigma=False, save=False, t_ref=t_ref)
 
 # T, signal = bern.sh2timeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref)
 # filt365 = signal - utils.ma(signal, 365)
@@ -129,6 +92,80 @@ unitTo = 'N'
 # plt.grid()
 # plt.legend()
 # plt.show()
+
+# # Plot link timeseries --------------------------------------------------------
+braun_bern = CLONETS.search_link('locations', ('Braunschweig', 'Bern'))[0]
+braun_virginiakey = CLONETS.search_link('locations', ('Braunschweig', 'VIRGINIA KEY, FL'))[0]
+dunkerque_virginiakey = CLONETS.search_link('locations', ('DUNKERQUE', 'VIRGINIA KEY, FL'))[0]
+dunkerque_barcelona = CLONETS.search_link('locations', ('DUNKERQUE', 'BARCELONA'))[0]
+
+braun_bern.plotTimeseries(T, 'O', 'pot', unitTo, sigma=False, vmin=-2.2,
+                          vmax=2.2, save=False, t_ref=t_ref)
+braun_bern.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400, sigma=False,
+                               save=False, t_ref=t_ref)
+
+# # Plot Root Mean Square -------------------------------------------------------
+# fig, data = CLONETS.plotRMS(T, 'H', 'ewh', 'ewh', save=True, hourly=False,
+#                             trend=31)
+# fig.show()
+
+# # Plot Root Mean Square for public --------------------------------------------
+# fig, data = CLONETS.plotRMS2(T, 'H', 'ewh', 'ewh', save=True, trend=31)
+# fig.show()
+
+# # Plot Earth System Component -------------------------------------------------
+# unitTo = 'N'
+# esc = 'O'
+# # lmax = 179
+# d1 = '2006_01'
+# d0 = '2006'
+# fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0,
+#                                     world=False, save=False)#,
+#                                     # loc_ref='Braunschweig')
+# # fig, data2 = CLONETS.plotESC(esc, d1, 'pot', unitTo, t_ref=d0, save=False,
+# #                               world=True)#, lmax=40)
+# fig.show()
+
+# fig, ax = plt.subplots(figsize=(2, 3))
+# plt.hist(data, orientation='horizontal', bins=10)
+
+# # Video
+# T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+# for d1 in T:
+#     fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=False, save='png',
+#                                         world=True)
+
+# Plot network timeseries -----------------------------------------------------
+# loc= ['Bern', 'London', 'Warsaw', 'Gothenburg', 'Helsinki']
+# loc_ref = 'Braunschweig'
+# t_ref = '200510-200809'
+# # t_ref = '2007'
+# fig = CLONETS.plotTimeseries(T, 'I', 'ewh', 'ff', loc=loc, loc_ref=loc_ref, 
+#                              t_ref=t_ref)
+# plt.show()
+
+# # Plot network frequencies ----------------------------------------------------
+# loc= ['Bern', 'London', 'Warsaw', 'Gothenburg', 'Helsinki']
+# loc_ref = 'Braunschweig'
+# fig = CLONETS.plotTimeFrequencies(T, 'I', 'ewh', 'ff', 86400*365/12, loc=loc,
+#                                   loc_ref=loc_ref, save=False, t_ref=t_ref)
+
+# Plot GRACE vs clocks timeseries ---------------------------------------------
+# Assuming we know the elevation change better than the geoid change
+# fig, t, tm, data, grace, sigma, s_grace = CLONETS.plotErrorTimeseries(
+#     'A', 'pot', 'N', 'Bern', monthly=False, save=False)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_tm.npy', tm)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_data.npy', data)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_grace.npy', grace)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_sigma.npy', sigma)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_s_grace.npy', s_grace)
+# fig, t, tm, data, grace, sigma, s_grace = CLONETS.plotErrorTimeseries(
+#     'A', 'pot', 'N', 'Bonn', monthly=False, save=False)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_tm.npy', tm)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_data.npy', data)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_grace.npy', grace)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_sigma.npy', sigma)
+# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_s_grace.npy', s_grace)
 
 # # FFT of the clock signal -----------------------------------------------------
 # delta_x = 86400  # [s]
@@ -254,61 +291,6 @@ unitTo = 'N'
 # In regard to this master thesis GRACE data as well as NOAH data is indeed evaluated at
 # the station’s positions."
 
-# # Plot link timeseries --------------------------------------------------------
-# braun_stras = CLONETS.search_link('locations',
-#                                   ('Braunschweig', 'Strasbourg'))[0]
-# braun_goth = CLONETS.search_link('locations',
-#                                   ('Braunschweig', 'Gothenburg'))[0]
-# braun_hel = CLONETS.search_link('locations', ('Braunschweig', 'Helsinki'))[0]
-braun_bern = CLONETS.search_link('locations', ('Braunschweig', 'Bern'))[0]
-# braun_lond = CLONETS.search_link('locations', ('Braunschweig', 'London'))[0]
-braun_virginiakey = CLONETS.search_link('locations', ('Braunschweig', 'VIRGINIA KEY, FL'))[0]
-dunkerque_virginiakey = CLONETS.search_link('locations', ('DUNKERQUE', 'VIRGINIA KEY, FL'))[0]
-dunkerque_barcelona = CLONETS.search_link('locations', ('DUNKERQUE', 'BARCELONA'))[0]
-
-# braun_stras.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                             save=True)
-# braun_stras.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, t_ref=t_ref,
-#                                 sigma=sigma,
-#                                 fmax=20, save=True)
-
-# braun_goth.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=True)
-# braun_goth.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, t_ref=t_ref,
-#                                 sigma=sigma,
-#                                 fmax=20, save=True)
-
-# braun_hel.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=True)
-# braun_hel.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, t_ref=t_ref,
-#                               sigma=sigma,
-#                               fmax=20, save=True)
-
-# data = braun_bern.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                                  save=False)
-# braun_bern.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, t_ref=t_ref,
-#                                 sigma=sigma, save=False)
-# braun_bern.plotTimeseries(T, 'A', 'pot', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=False)
-# braun_bern.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400, t_ref=t_ref,
-#                                 sigma=sigma, save=False)
-
-# braun_lond.plotTimeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref, sigma=sigma,
-#                           save=True)
-# braun_lond.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, t_ref=t_ref,
-#                                 sigma=sigma,
-#                                 fmax=20, save=True)
-
-
-braun_bern.plotTimeseries(T, 'O', 'pot', unitTo, t_ref=t_ref, sigma=False,
-                          vmin=-2.2, vmax=2.2, save=False)
-braun_virginiakey.plotTimeseries(T, 'O', 'pot', unitTo, t_ref=t_ref, sigma=False,
-                                 vmin=-2.2, vmax=2.2, save=False)
-dunkerque_virginiakey.plotTimeseriesIncrements(
-    T, 'O', 'pot', unitTo, t_ref=t_ref, sigma=False, vmin=-2.4, vmax=2.4)
-dunkerque_barcelona.plotTimeseriesIncrements(
-    T, 'O', 'pot', unitTo, t_ref=t_ref, sigma=False, vmin=-2.4, vmax=2.4)
-
 # Find out n_eff --------------------------------------------------------------
 # data = braun_bern.plotTimeseries(T, 'A', 'pot', unitTo, t_ref=t_ref, sigma=sigma,
 #                                   save=False)
@@ -331,106 +313,7 @@ dunkerque_barcelona.plotTimeseriesIncrements(
 #         C = harmony.disc_autocovariance(data + noise[i])
 #         n_eff[i] += harmony.autocovariance_fct2neff(C[:31], m=31)
 # n_eff = n_eff / N
-
-# # Plot network timeseries -----------------------------------------------------
-# loc= ['Bern', 'London', 'Warsaw', 'Gothenburg', 'Helsinki']
-# loc_ref = 'Braunschweig'
-# t_ref = '200510-200809'
-# # t_ref = '2007'
-# fig = CLONETS.plotTimeseries(T, 'I', 'ewh', 'ff', t_ref=t_ref, loc=loc,
-#                               loc_ref=loc_ref)#, lmax=179)
-# plt.show()
-
-# tt, data_ref = braunschweig.sh2timeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref)
-# tt, data = helsinki.sh2timeseries(T, 'H', 'ewh', unitTo, t_ref=t_ref)
-# data, data_Ref = 1e3 * np.array(data), 1e3 * np.array(data_ref)
-# plt.plot(tt, data-data_ref)
-# tt, data_ref = braunschweig.sh2timeseries(T, 'H', 'ewh', 'N', t_ref=t_ref, lmax=10)
-# tt, data = helsinki.sh2timeseries(T, 'H', 'ewh', 'N', t_ref=t_ref, lmax=10)
-# data, data_Ref = 1e3 * np.array(data), 1e3 * np.array(data_ref)
-# plt.plot(tt, data-data_ref)
-# T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
-# tt, data_ref = braunschweig.sh2timeseries(T, 'H', 'ewh', 'N', t_ref=t_ref)
-# tt, data = helsinki.sh2timeseries(T, 'H', 'ewh', 'N', t_ref=t_ref)
-# data, data_Ref = 1e3 * np.array(data), 1e3 * np.array(data_ref)
-# plt.plot(tt, data-data_ref)
-
-
-# # Plot network frequencies ----------------------------------------------------
-# loc= ['Bern', 'London', 'Warsaw', 'Gothenburg', 'Helsinki']
-# loc_ref = 'Braunschweig'
-# fig = CLONETS.plotTimeFrequencies(T, 'I', 'ewh', 'ff', 86400*365/12, t_ref=t_ref,
-#                                   loc=loc, loc_ref=loc_ref, save=False)#, lmax=179)
-
-# Plot GRACE vs clocks timeseries ---------------------------------------------
-# Assuming we know the elevation change better than the geoid change
-# fig, t, tm, data, grace, sigma, s_grace = CLONETS.plotErrorTimeseries(
-#     'A', 'pot', 'N', 'Bern', monthly=False, save=False)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_tm.npy', tm)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_data.npy', data)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_grace.npy', grace)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_sigma.npy', sigma)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bern_s_grace.npy', s_grace)
-# fig, t, tm, data, grace, sigma, s_grace = CLONETS.plotErrorTimeseries(
-#     'A', 'pot', 'N', 'Bonn', monthly=False, save=False)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_tm.npy', tm)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_data.npy', data)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_grace.npy', grace)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_sigma.npy', sigma)
-# np.save('/home/schroeder/CLONETS/data/ts_results/Bonn_s_grace.npy', s_grace)
-
-
-# # Plot Root Mean Square -------------------------------------------------------
-# fig, data = CLONETS.plotRMS(T, 'H', 'ewh', 'ewh', save=True, hourly=False,
-#                             trend=31)
-# fig.show()
-
-# # Plot Root Mean Square for öffentlichkeit-----------------------------------
-# fig, data = CLONETS.plotRMS2(T, 'H', 'ewh', 'ewh', save=True, trend=31)
-# fig.show()
-
-# Plot Earth System Component -------------------------------------------------
-unitTo = 'N'
-esc = 'O'
-# lmax = 179
-d1 = '2006_01'
-d0 = '2006'
-fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=d0,
-                                    world=False, save=False)#,
-                                    # loc_ref='Braunschweig')
-# fig, data2 = CLONETS.plotESC(esc, d1, 'pot', unitTo, t_ref=d0, save=False,
-#                               world=True)#, lmax=40)
-fig.show()
-
-# fig, ax = plt.subplots(figsize=(2, 3))
-# plt.hist(data, orientation='horizontal', bins=10)
-
-# Video
-# T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
-# for d1 in T:
-#     fig, data = CLONETS.plotESCatClocks(esc, d1, 'pot', unitTo, t_ref=False, save='png',
-#                                         world=True)
     
-    
-
-# cb_dict = {'U': '"gravitational potential [m@+2@+/s@+2@+]"',
-#             'N': '"Geoid height [mm]"',
-#             'h': '"Elevation [mm]"',
-#             'sd': '"Surface Density [kg/m@+2@+]"',
-#             'ewh': '"Equivalent water height [m]"',
-#             'gravity': '"gravitational acceleration [m/s@+2@+]"',
-#             'ff': '"Fractional frequency [-]"',
-#             'GRACE': '"Geoid height [mm]"'}
-# fig = CLONETS.plot_europe_720(data2, cfg.PATHS['data_path'] + esc + '/',
-#                               '', esc, unitTo, cb_dict, 'esc')
-# fig.show()
-
-# spec = sigma2.spectrum()
-# plt.plot(np.arange(2, 50), 6371000*np.sqrt(spec[2:50]))
-# plt.yscale('log')
-# plt.grid()
-# plt.savefig('/home/schroeder/CLONETS/fig/H/' + esc + '_' + str(lmax) + '_' + d1 + '.pdf')
-
 # Plot Autocorrelation --------------------------------------------------------
 # clocks = []
 # for clo in CLONETS.clocks:
