@@ -44,20 +44,43 @@ class Clock():
     """An optical clock.
     
     A class for an optical clock entity with all its nessecary information such
-    as location, stability, drift, gepotential and elevation timeseries, ...
+    as location or other linked clocks.
     
-    :param lat: latitude of the clock location
-    :type lat: float
-    :param lon: longitude of the clock location
-    :type lon: float
-    :param location: name of (usually) the location of the clock
-    :type location: str
-    :param country: Country of the location
-    :type country: str
-    :param path: directory of the clock
-    :type path: str
-    :param links: fibre links to other clocks
-    :type links: list of Clocks
+    Attributes
+    ----------
+    location: str
+        Place of the clock, e.g. city name
+    country: str
+        Country in which the clock is located
+    lat: float
+        Latitude
+    lon: float
+        Longitude
+    links: list of Link
+        Links to other Clocks
+    states: list of int
+        States of the Links to other Clocks
+    
+    Functions
+    ---------
+    link_to():
+        Link to another clock.
+    def h2ff():
+        Convert elevation change to fractional frequency change.
+    def N2ff():
+        Convert geoid height change to fractional frequency change.
+    construct_noise():
+        Construct noise for the 3 scenarios.
+    sh2timeseries():
+        Expands spherical harmonics at clock location.
+    sh2timeseries_error():
+        Expands spherical harmonics plus errors at clock location.
+    plotTimeseries():
+        Plots time series at clock location.
+    plotTimeFrequencies():
+        Plots time series in frequency domain at clock location.
+    plotCorrelation():
+        Plots the correlation of all grid cells' time series.
     """
     
     def __init__(self, location='', lat=0, lon=0, country=None, path=False):
@@ -71,7 +94,7 @@ class Clock():
         self.states = []
         
     def __repr__(self):
-        """To be printed if instance is pwritten."""
+        """To be printed if instance is written."""
         
         summary = '<clones.Clock>\n'
         summary += 'Location: ' + self.location + '\n'
@@ -82,14 +105,28 @@ class Clock():
         return summary + ')\n \n'
     
     def link_to(self, b, s):
-        """Link to another clock."""
+        """Link to another clock.
+        
+        Parameters
+        ----------
+        b: Clock
+            Clock to link to
+        s: int
+            state of the new link (see Link description)
+        """
         
         self.links.append(b)
         self.states.append(s)
         # TODO: add a pointer to or a Link itself to this (self) instance of clock?
         
     def h2ff(self, h):
-        """Convert elevation change to fractional frequency change."""
+        """Convert elevation change to fractional frequency change.
+        
+        Parameters
+        ----------
+        h: np.array of floats
+            time series of vertical height
+        """
         
         g = 9.81  # [m/s^2]
         c = astropy.constants.c.value  # [m/s] 
@@ -97,7 +134,13 @@ class Clock():
         return ff
     
     def N2ff(self, N):
-        """Convert geoid height change to fractional frequency change."""
+        """Convert geoid height change to fractional frequency change.
+        
+        Parameters
+        ----------
+        N: np.array of floats
+            time series of geoid height
+        """
         
         g = 9.81  # [m/s^2]
         c = astropy.constants.c.value  # [m/s] 
@@ -112,8 +155,10 @@ class Clock():
         different noises, clock white noise, gnss white noise, and gnss flicker
         noise.
         
-        :param N: length of the time series
-        :type N: int
+        Parameters
+        ----------
+        N: int
+            length of the time series
         """
         
         sigma_clock = np.array([1e-18, 1e-19, 1e-20])
@@ -132,176 +177,63 @@ class Clock():
         
         return noise
     
-    def _sh2timeseries(self, F_lm, t, kind, unit, unitTo=[]):
-        """Expand spherical harmonics into timeseries at clock location.
-        
-        DEPRECATED!
-        
-        :param F_lm: spherical harmonic coefficients
-        :type F_lm: list of pyshtools.SHCoeffs
-        :param t: time vector of decimal years
-        :type t: numpy.array
-        :param kind: origin of the mass redistribution
-        :type kind: str
-        :param unit: the input unit of the coefficients
-        :type unit: str
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' .... elevation [m]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            
-        Possible kinds:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
-            'S' ... Solid Earth            
-        """
-        
-        # TODO: store time of effect only in network or also in network?
-        
-        if not unitTo:  # convert the unit of the spherical harmonics?
-            if (kind == 'I' and hasattr(self, 'I') or
-                kind == 'H' and hasattr(self, 'H') or
-                kind == 'A' and hasattr(self, 'A') or
-                kind == 'O' and hasattr(self, 'O') or
-                kind == 'GIA' and hasattr(self, 'GIA') or
-                kind == 'S' and hasattr(self, 'S')):
-                effect = []
-                for f_lm in F_lm:
-                    effect.append(f_lm.expand(lat=self.lat, lon=self.lon))
-                try:
-                    k = getattr(self, kind)
-                    k[unit] = np.array(effect)
-                except:
-                    print('Choose a proper kind of effect!') 
-#                if kind == 'I':
-#                    self.I[unit] = np.array(effect)
-#                elif kind == 'H':
-#                    self.H[unit] = np.array(effect)
-#                elif kind == 'A':
-#                    self.A[unit] = np.array(effect)
-#                elif kind == 'O':
-#                    self.O[unit] = np.array(effect)
-#                elif kind == 'GIA':
-#                    self.GIA[unit] = np.array(effect)
-#                elif kind == 'S':
-#                    self.S[unit] = np.array(effect)
-#                else:
-#                    print('Choose a proper kind of effect!')
-            else:  # kind not yet there!
-                effect = []
-                for f_lm in F_lm:
-                    effect.append(f_lm.expand(lat=self.lat, lon=self.lon))
-                effects = {}
-                effects['t'] = t
-                effects[unit] = np.array(effect)
-                try:
-                    setattr(self, kind, effects)
-                except:
-                    print('Choose a proper kind of effect!')
-                    
-        else:  # convert the unit of the spherical harmonics!
-            if (kind == 'I' and hasattr(self, 'I') or
-                kind == 'H' and hasattr(self, 'H') or
-                kind == 'A' and hasattr(self, 'A') or
-                kind == 'O' and hasattr(self, 'O') or
-                kind == 'GIA' and hasattr(self, 'GIA') or
-                kind == 'S' and hasattr(self, 'S')):
-                for u in unitTo:
-                    effect = []
-                    for f_lm in F_lm:
-                        f_lm_u = harmony.sh2sh(f_lm, unit, u)
-                        effect.append(f_lm_u.expand(lat=self.lat, lon=self.lon))
-                    try:
-                        k = getattr(self, kind)
-                        k[u] = np.array(effect)
-                    except:
-                        print('Choose a proper kind of effect!')                          
-#                    if kind == 'I':
-#                        self.I[u] = np.array(effect)
-#                    elif kind == 'H':
-#                        self.H[u] = np.array(effect)
-#                    elif kind == 'A':
-#                        self.A[u] = np.array(effect)
-#                    elif kind == 'O':
-#                        self.O[u] = np.array(effect)
-#                    elif kind == 'GIA':
-#                        self.GIA[u] = np.array(effect)
-#                    elif kind == 'S':
-#                        self.S[u] = np.array(effect)
-#                    else:
-#                        print('Choose a proper kind of effect!')  
-            else:  # kind not yet there!
-                effects = {}
-                effects['t'] = t
-                for u in unitTo:
-                    effect = []
-                    for f_lm in F_lm:
-                        f_lm_u = harmony.sh2sh(f_lm, unit, u)
-                        effect.append(f_lm_u.expand(lat=self.lat,
-                                                    lon=self.lon))
-                    effects[u] = np.array(effect)
-                try:
-                    setattr(self, kind, effects)
-                except:
-                    print('Choose a proper kind of effect!')
-                    
-    def sh2timeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-                      reset=False, error=False, sigma=False, filt=False,
-                      lmin=False, lmax=False, field=False):
+    def sh2timeseries(self, T, esc, unitFrom, unitTo, t_ref=False, sigma=False,
+                      filt=False, lmin=False, lmax=False, field=False):
         """Expands spherical harmonics at clock location.
         
         Takes the spherical harmonics from the data folder at a given time
         interval and expands them at the clock location.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time)
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param error: the clock error type: 'white' or 'allan'
-        :type error: str
-        :param sigma: uncertainty of the clock
-        :type sigma: float
-        :param filt: filter width for the data, has to be an odd number
-        :type filt: integer, optional
-        :return T_date: dates of the timeseries
-        :rtype T_date: list of str
-        :return series: timeseries
-        :rtype series: list of floats
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        t_ref: str or datetime.date(time)
+            reference time for the series
+        sigma: float, optional
+            uncertainty of the clock
+        filt: int, optional
+            filter width for the data, has to be an odd number
+        lmin: int, optional
+            minimum spherical harmonic degree
+        lmax: int, optional
+            maximum spherical harmonic degree
+        field: bool, optional
+            if True, returns a 2d array [time x location] of a regular grid
+            instead of a time series for the clock
         
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Returns
+        -------
+        T_date: list of str
+            dates of the timeseries
+        series: list of floats
+            time series
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         esc_dict = {'I': 'oggm_',
@@ -387,54 +319,66 @@ class Clock():
         return T_date, series    
     
     def sh2timeseries_error(self, add, T, esc, unitFrom, unitTo, t_ref=False,
-                            reset=False, error=False, sigma=False, filt=False,
-                            lmin=False, lmax=False):
-        """Expands spherical harmonics at clock location.
+                            error=False, sigma=False, filt=False, lmin=False,
+                            lmax=False):
+        """Expands spherical harmonics plus errors at clock location.
         
         Takes the spherical harmonics from the data folder at a given time
         interval, adds a given additional set of sh's, e.g. errors, and expands
         them at the clock location.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time)
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param error: the clock error type: 'white' or 'allan'
-        :type error: str
-        :param sigma: uncertainty of the clock
-        :type sigma: float
-        :param filt: filter width for the data, has to be an odd number
-        :type filt: integer, optional
-        :return T_date: dates of the timeseries
-        :rtype T_date: list of str
-        :return series: timeseries
-        :rtype series: list of floats
+        Parameters
+        ----------
+        add: sh.SHCoeffs
+            spherical harmonics to be added and subtracted from the originals
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        t_ref: str or datetime.date(time)
+            reference time for the series
+        sigma: float, optional
+            uncertainty of the clock
+        filt: int, optional
+            filter width for the data, has to be an odd number
+        lmin: int, optional
+            minimum spherical harmonic degree
+        lmax: int, optional
+            maximum spherical harmonic degree
+        field: bool, optional
+            if True, returns a 2d array [time x location] of a regular grid
+            instead of a time series for the clock
         
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Returns
+        -------
+        T_date: list of str
+            dates of the timeseries
+        series: list of floats
+            time series
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         esc_dict = {'I': 'oggm_',
@@ -509,40 +453,40 @@ class Clock():
         Uses sh2timeseries() and plots the resulting time series at clock
         location.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component(s)
-        :type esc: str or list of str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time), optional
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param error: the clock error type: 'white' or 'allan'
-        :type error: str, optional
-        :param sigma: uncertainty of the clock
-        :type sigma: float, optional
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        sigma: float, optional
+            uncertainty of the clock
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
         
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         np.random.seed(7)
@@ -628,46 +572,46 @@ class Clock():
         Uses sh2timeseries() and plots the resulting time series in frequency
         domain at clock location.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component(s)
-        :type esc: str or list of str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time), optional
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param error: the clock error type: 'white' or 'allan'
-        :type error: str, optional
-        :param sigma: uncertainty of the clock
-        :type sigma: float, optional
-        :param delta_t: measurement sampling rate [s]
-        :type delta_t: float
-        :param fmax: maximum plottable frequency band
-        :type fmax: integer, optional
-        :param filt: filter width for the data, has to be an odd number
-        :type filt: integer, optional
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        t_ref: str or datetime.date(time)
+            reference time for the series
+        delta_t: float
+            measurement sampling rate [s]
+        sigma: float, optional
+            uncertainty of the clock
+        fmax: int, optinonal
+            maximum plottable frequency band
+        save: str, optional
+            if True, save plot as 'png' or 'pdf'
+
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         np.random.seed(7)
@@ -739,38 +683,51 @@ class Clock():
         Computes the correlation of all grid cells' time series with respect
         to the clock's timeseries and plots it with pyGMT.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param save: shall the figure be saved
-        :type save: boolean
-        :return fig: the figure object
-        :rtype fig: pygmt.Figure
-        :return grid: the plottet data grid
-        :rtype grid: pyshtools.SHGrid
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-                'GRACE' ... geoid height [m], but with lmax=120 and filtered
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        trend: str, optional
+            'linear' trend or '(semi-)annual' signal?
+        save: str, optional
+            if True, save plot as 'png' or 'pdf'
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
+        Returns
+        -------
+        fig: pygmt.Figure
+            pygmt Figure object that has been created
+        grid: sh.SHGrid
+            worldwide grid of the correlation
+        distances: np.array of floats
+            distance classes for the correlation
+        EUROPA_corr: np.array of floats
+            2d array of the correlation
+
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         esc_dict = {'I': 'oggm_',
@@ -903,9 +860,6 @@ class Link():
         """Instanciates a fibre link between two clocks a and b."""
         
         self.state = state
-        self.a = a
-        self.b = b
-        self.name = a.location + ' --- ' + b.location
         
     def __repr__(self):
         """To be printed if instance is written."""
