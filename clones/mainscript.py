@@ -31,7 +31,7 @@ import colorednoise as cn
 cfg.configure()
 
 # Clock initialisation --------------------------------------------------------
-CLONETS = Network('psmsl')
+CLONETS = Network('psmsl_only', region='eu_atlantic')
 print(CLONETS)
 
 # Plot network with pyGMT -----------------------------------------------------
@@ -39,17 +39,17 @@ print(CLONETS)
 # fig.show()
 
 # Define two clocks -----------------------------------------------------------
-bonn = CLONETS.search_clock('location', 'Bonn')[0]
-bern = CLONETS.search_clock('location', 'Bern')[0]
-braunschweig = CLONETS.search_clock('location', 'Braunschweig')[0]
+# bonn = CLONETS.search_clock('location', 'Bonn')[0]
+# bern = CLONETS.search_clock('location', 'Bern')[0]
+# braunschweig = CLONETS.search_clock('location', 'Braunschweig')[0]
 # torino = CLONETS.search_clock('location', 'Torino')[0]
 # helsinki = CLONETS.search_clock('location', 'Helsinki')[0]
 # gothenburg = CLONETS.search_clock('location', 'Gothenburg')[0]
 # strasbourg = CLONETS.search_clock('location', 'Strasbourg')[0]
 # london = CLONETS.search_clock('location', 'London')[0]
 
-virginiakey = CLONETS.search_clock('location', 'VIRGINIA KEY, FL')[0]
-barcelona = CLONETS.search_clock('location', 'BARCELONA')[0]
+# virginiakey = CLONETS.search_clock('location', 'VIRGINIA KEY, FL')[0]
+# barcelona = CLONETS.search_clock('location', 'BARCELONA')[0]
 dunkerque = CLONETS.search_clock('location', 'DUNKERQUE')[0]
 
 # # Hourly datetime timeseries --------------------------------------------------
@@ -62,9 +62,9 @@ t0 = datetime.date(2007, 1, 1)
 T = [t0 + datetime.timedelta(d) for d in range(0, 365)]
 t_ref = '2007'
 
-# # Monthly string timeseries ---------------------------------------------------
-# t_ref = '2006'
-# T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
+# Monthly string timeseries ---------------------------------------------------
+t_ref = '2006'
+T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
 
 # # Monthly string timeseries 3 years -------------------------------------------
 # months = ['%02d' % (i) for i in range(1, 13)] * 3
@@ -94,15 +94,15 @@ unitTo = 'N'
 # plt.show()
 
 # # Plot link timeseries --------------------------------------------------------
-braun_bern = CLONETS.search_link('locations', ('Braunschweig', 'Bern'))[0]
-braun_virginiakey = CLONETS.search_link('locations', ('Braunschweig', 'VIRGINIA KEY, FL'))[0]
-dunkerque_virginiakey = CLONETS.search_link('locations', ('DUNKERQUE', 'VIRGINIA KEY, FL'))[0]
-dunkerque_barcelona = CLONETS.search_link('locations', ('DUNKERQUE', 'BARCELONA'))[0]
+# braun_bern = CLONETS.search_link('locations', ('Braunschweig', 'Bern'))[0]
+# braun_virginiakey = CLONETS.search_link('locations', ('Braunschweig', 'VIRGINIA KEY, FL'))[0]
+# dunkerque_virginiakey = CLONETS.search_link('locations', ('DUNKERQUE', 'VIRGINIA KEY, FL'))[0]
+# dunkerque_barcelona = CLONETS.search_link('locations', ('DUNKERQUE', 'BARCELONA'))[0]
 
-braun_bern.plotTimeseries(T, 'O', 'pot', unitTo, sigma=False, vmin=-2.2,
-                          vmax=2.2, save=False, t_ref=t_ref)
-braun_bern.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400, sigma=False,
-                               save=False, t_ref=t_ref)
+# braun_bern.plotTimeseries(T, 'O', 'pot', unitTo, sigma=False, vmin=-2.2,
+#                           vmax=2.2, save=False, t_ref=t_ref)
+# braun_bern.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400, sigma=False,
+#                                save=False, t_ref=t_ref)
 
 # # Plot Root Mean Square -------------------------------------------------------
 # fig, data = CLONETS.plotRMS(T, 'H', 'ewh', 'ewh', save=True, hourly=False,

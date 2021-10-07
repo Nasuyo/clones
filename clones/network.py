@@ -23,6 +23,8 @@ import shutil
 import xarray as xr
 import json
 import geojson
+from shapely.geometry import Point, Polygon
+import geopandas as gpd
 import contextily as ctx
 import pandas as pd
 import geopandas as gpd
@@ -1300,7 +1302,7 @@ class Network():
     :type links: list of Links
     """
     
-    def __init__(self, name, reset=False):
+    def __init__(self, name, region=False, reset=False):
         """Builds an optical clock network."""
         
         self.clocks = []
@@ -1552,7 +1554,103 @@ class Network():
             self.add_clock(gothenburg)
         else:
             print('Network name not found! Network empty!')
-            
+        
+        if region:
+            if region == 'eu_atlantic':
+                poly = Polygon([(-32, 70),  # (lon, lat)
+                               (-32, 27),
+                               (-5.5, 27),
+                               (-5.5, 42),
+                               (2, 42),
+                               (2, 48),
+                               (32, 48),
+                               (32, 70),
+                               (-32, 70)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/eu_atlantic.json', driver='GeoJSON')
+            elif region == 'mediterranean':
+                poly = Polygon([(2, 48),
+                                (2, 42),
+                                (-5.5, 42),
+                                (-5.5, 30),
+                                (43, 30),
+                                (43, 48),
+                                (2, 48)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/mediterranean.json', driver='GeoJSON')
+            elif region == 'na_atlantic':
+                poly = Polygon([(-100, 65),
+                                (-100, 18),
+                                (-90, 18),
+                                (-90, 15),
+                                (-85, 15),
+                                (-85, 12),
+                                (-45, 12),
+                                (-45, 65),
+                                (-100, 65)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/na_atlantic.json', driver='GeoJSON')
+            elif region == 'na_pacific':
+                poly = Polygon([(-100, 65),
+                                (-165, 65),
+                                (-165, 12),
+                                (-85, 12),
+                                (-85, 15),
+                                (-90, 15),
+                                (-90, 18),
+                                (-100, 18),
+                                (-100, 65)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/na_pacific.json', driver='GeoJSON')
+            elif region == 'asia_pacific':
+                poly = Polygon([(165, 65),
+                                (100, 65),
+                                (100, 15),
+                                (165, 15),
+                                (165, 65)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/asia_pacific.json', driver='GeoJSON')
+            elif region == 'oceania':
+                poly = Polygon([(100, 15),
+                                (100, -2),
+                                (106, -2),
+                                (106, -7),
+                                (135, -7),
+                                (135, -60),
+                                (180, -60),
+                                (180, 15),
+                                (100, 15)])
+                poly2 = Polygon([(-180, 15),
+                                 (-180, -60),
+                                 (-140, -60),
+                                 (-140, 15),
+                                 (-180, 15)])
+                # cp_df = gpd.GeoDataFrame()
+                # cp_df.loc[0, 'geometry'] = poly
+                # cp_df.to_file('../data/oceania.json', driver='GeoJSON')
+                for i in np.arange(len(self.clocks)-1, 0, -1):
+                    print(i)
+                    if (not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly) and
+                        not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly2)):
+                        del self.clocks[i]
+                return
+            elif region == 'antarctic':
+                pass #TODO
+            elif region == 'arctic':
+                pass #TODO
+            else:
+                print('Wrong region name during Network initialization!')
+
+            for i in np.arange(len(self.clocks)-1, 0, -1):
+                print(i)
+                if not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly):
+                    del self.clocks[i]
+        
     def __repr__(self):
         """To be printed if instance is written."""
         
