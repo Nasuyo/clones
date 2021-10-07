@@ -564,9 +564,6 @@ class Clock():
             plt.savefig(path)
             #TODO: case for esc is list
     
-    # def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t,
-    #                         fmax=False, t_ref=False, reset=False, error=False,
-    #                         sigma=False, filt=False, save=False):
     def plotTimeFrequencies(self, T, esc, unitFrom, unitTo, delta_t, 
                             sigma=False, fmax=False, save=False, **kwargs):
         """Plots time series in frequency domain at clock location.
@@ -584,8 +581,6 @@ class Clock():
             unit of the input coefficients
         unitTo: str
             unit of the output timeseries
-        t_ref: str or datetime.date(time)
-            reference time for the series
         delta_t: float
             measurement sampling rate [s]
         sigma: float, optional
@@ -844,12 +839,31 @@ class Clock():
 class Link():
     """A fibre link between two clocks.
     
-    :param a: clock A
-    :type a: Clock
-    :param b: clock B
-    :type b: Clock
-    :param status: status of the link
-    :type status: int
+    Attributes
+    ----------
+    a: Clock
+        clock A
+    b: Clock
+        clock B
+    state: int
+        status of the link
+    
+    Functions
+    ---------
+    length():
+        Returns the length of the fibre link in km.
+    analyze_degrees(): 
+        Experiment for analyzing signal after removing low degrees.
+        see also analyze_degrees2() and analyze_degrees3()
+    plotTimeseries():
+        Plots the differential time series.
+    plotTimeSeriesIncrements():
+        creates one time series plot per point in time, up to this point in time
+    plotTimeFrequencies():
+        Plots time series in frequency domain at clock location.
+    plotCorrelation():
+        Plots the correlation of all grid cells' time series.
+    
     
     possible states:
         0 ... existing
@@ -875,12 +889,19 @@ class Link():
         return summary
         
     def length(self):
-        """Returns the length of the fibre link in km."""
+        """Returns the length of the fibre link in km.
+        
+        Returns
+        -------
+        geopy.distance
+            distance between the two clocks in kilometers
+        """
         
         return geopy.distance.geodesic((self.a.lat, self.a.lon),
                                        (self.b.lat, self.b.lon)).km
     
     def analyze_degrees(self, T, esc, unitFrom, unitTo, lmax, t_ref=False):
+        """Experiment for analyzing signal after removing low degrees."""
         
         T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
                                            t_ref=t_ref)
@@ -895,7 +916,7 @@ class Link():
             T_b2, data_b2 = self.b.sh2timeseries(T, esc, unitFrom, unitTo,
                                                  t_ref=t_ref, lmin=i)
             trunc_timeseries = np.array(data_b2) - np.array(data_a2)
-            power[i] = utils.rms(full_timeseries, trunc_timeseries)
+            power[i] = utils.rms(full_timeseries, trunc_timeseries)  # difference to analyze_degrees2()
             print(i)
 
         if unitTo in('N', 'h', 'GRACE'):
@@ -904,6 +925,7 @@ class Link():
         return power
     
     def analyze_degrees2(self, T, esc, unitFrom, unitTo, lmax, t_ref=False):
+        """Experiment for analyzing signal after removing low degrees."""
         
         T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
                                            t_ref=t_ref)
@@ -927,6 +949,7 @@ class Link():
         return power
     
     def analyze_degrees3(self, T, esc, unitFrom, unitTo, lmax, t_ref=False):
+        """Experiment for analyzing signal after removing high degrees."""
         
         T_a, data_a = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
                                            t_ref=t_ref)
@@ -937,7 +960,7 @@ class Link():
         power = np.zeros(lmax)
         for i in range(lmax):
             T_a2, data_a2 = self.a.sh2timeseries(T, esc, unitFrom, unitTo,
-                                                 t_ref=t_ref, lmax=i)
+                                                 t_ref=t_ref, lmax=i)  # difference to analyze_degrees()
             T_b2, data_b2 = self.b.sh2timeseries(T, esc, unitFrom, unitTo,
                                                  t_ref=t_ref, lmax=i)
             trunc_timeseries = np.array(data_b2) - np.array(data_a2)
@@ -949,9 +972,6 @@ class Link():
         
         return power
             
-    # def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-    #                    reset=False, error=False, sigma=False, filt=False,
-    #                    lmax=False, save=False, vmin=False, vmax=False):
     def plotTimeseries(self, T, esc, unitFrom, unitTo, sigma=False, vmin=False,
                        vmax=False, save=False, **kwargs):
         """Plots the differential time series.
@@ -959,36 +979,49 @@ class Link():
         Uses sh2timeseries() for both clocks and plots the resulting
         differential time series.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component(s)
-        :type esc: str or list of str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time)
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        sigma: float, optional
+            uncertainty of the clock
+        vmin: float
+            lower y-limit 
+        vmax: float
+            upper y-limit 
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Returns
+        -------
+        np.array of floata:
+            time series difference between the two clocks
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         np.random.seed(7)
@@ -1092,10 +1125,49 @@ class Link():
         
         return data_b-data_a
     
-    
     def plotTimeSeriesIncrements(self, T, esc, unitFrom, unitTo, vmin=False,
                                  vmax=False, save=False, **kwargs):
-        """."""
+        """Creates one time series plot per point in time, up to this point in time.
+        
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        sigma: float, optional
+            uncertainty of the clock
+        vmin: float
+            lower y-limit 
+        vmax: float
+            upper y-limit 
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+            
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
+        """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
@@ -1142,48 +1214,46 @@ class Link():
         Uses sh2timeseries() and plots the resulting time series in frequency
         domain at clock location.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component(s)
-        :type esc: str or list of str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time), optional
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param error: the clock error type: 'white' or 'allan'
-        :type error: str, optional
-        :param sigma: uncertainty of the clock
-        :type sigma: float, optional
-        :param delta_t: measurement sampling rate [s]
-        :type delta_t: float
-        :param fmax: maximum plottable frequency band
-        :type fmax: integer, optional
-        :param filt: filter width for the data, has to be an odd number
-        :type filt: integer, optional
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
-        """
+        Parameters
+        ----------
+        T: list of str or datetime.date(time)
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        delta_t: float
+            measurement sampling rate [s]
+        sigma: float, optional
+            uncertainty of the clock
+        fmax: int, optinonal
+            maximum plottable frequency band
+        save: str, optional
+            if True, save plot as 'png' or 'pdf'
 
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
+        """
+        
         np.random.seed(7)
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
