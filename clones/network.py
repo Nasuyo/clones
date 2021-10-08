@@ -1366,10 +1366,51 @@ class Network():
     of the clocks and the links (class Link) between the clocks and has helpful
     tools for visualisation.
     
-    :param clocks: list of the clocks
-    :type clocks: list of Clocks
-    :param links: list of the links between the clocks
-    :type links: list of Links
+    Attributes
+    ----------
+    clocks: list of Clocks
+        a list of all clocks in the network
+    links: list of Links
+        a list of all the links connecting the clocks in the network
+
+    Functions
+    ---------
+    search_clock():
+        Search for a clock in the network.
+    search_link():
+        Search for a link in the network.
+    add_clock():
+        Adds a clock to the network.
+        Important for the initialization.
+    add_link():
+        Build a fibre link between two clocks a and b.
+        Important for the initialization.
+    lats():
+        Returns an array of the latitudes of all clocks.
+    lons():
+        Returns an array of the longitudes of all clocks.
+    plotNetwork():
+        Plots the network with gmt
+    plotESC():
+        Plots the earth system component signal on a map.
+    plotESCatClocks():
+        Plots the earth system component signal clockwise on a map.
+    plotRMS():
+        Plots the Root Mean Square of the signal on a map.
+    plotRMS2():
+        Plots the Root Mean Square on a map. Used for the "famous" picture.
+    plotRMSatClocks():
+        Plots the Root Mean Square of the signal clockwise on a map.
+    plotTimeseries():
+        Plots time series at each clock location.
+    plotTimeFrequencies():
+        Plots the spectral domain of the time series at clock location.
+    plotErrorTimeseries():
+        Plots a time series including GRACE and clock error ranges.
+    plot_world_720():
+        helper function for plotting on world map.
+    plot_europe_720():
+        helper function for plotting on Europe map.
     """
     
     def __init__(self, name, region=False, reset=False):
@@ -1732,13 +1773,18 @@ class Network():
     def search_clock(self, attr, value):
         """Search for a clock in the network.
         
-        :param attr: the attribute via which is searched
-        :type attr: str
-        :param value: the value which is searched for or a range (if searched
-        via lat or lon)
-        :type value: str or tupel of 2 floats (if searched via lat or lon)
-        :return: list of the fitting clocks
-        :rtype: list of Clocks
+        Parameters
+        ----------
+        attr: str
+            the attribute via which is searched
+        value: str or tupel of 2 floats (if searched via lat or lon)
+            the value which is searched for or a range (if searched
+            via lat or lon)
+        
+        Returns
+        -------
+        clos: list of Clocks
+            list of the fitting clocks
         """
         
         clos = []
@@ -1763,14 +1809,20 @@ class Network():
     def search_link(self, attr, value):
         """Search for a link in the network.
         
-        :param attr: the attribute via which is searched
-        :type attr: str
-        :param value: the value which is searched for
-        :type value: str or tupel of 2 floats (if searched via lat or lon)
-        :return: list of the fitting links
-        :rtype: list of Links
+        Parameters
+        ----------
+        attr: str
+            the attribute via which is searched
+        value: str or tupel of 2 floats (if searched via lat or lon)
+            the value which is searched for
+
+        Returns
+        -------
+        l: list of Links
+            list of the fitting links
         
-        Possible Attibutes:
+        Possible Attibutes
+        ------------------
             - location ... one location of the link
             - locations ... both locations of the link
             - distance ... tuple or list or numpy.array of min and max distance
@@ -1798,10 +1850,12 @@ class Network():
     def add_clock(self, clo):
         """Adds a clock to the network.
         
-        :param clock: an optical clock
-        :type clock: Clock
-        :param links: links of the clock to other clocks in the network
-        :type links: list of names or clocks, optional
+        Parameters
+        ----------
+        clock: Clock
+            an optical clock
+        links: list of names or clocks, optional
+            links of the clock to other clocks in the network
         """
         
         if clo not in self.clocks:
@@ -1810,7 +1864,15 @@ class Network():
             print('Warning: Clock ' + clo + ' is already in the network!')
         
     def add_link(self, a, b, state=9):
-        """Build a fibre link between two clocks a and b."""
+        """Build a fibre link between two clocks a and b.
+        
+        Parameters
+        ----------
+        a, b: Clock
+            clocks that are connected by the new link
+        state: int, optional
+            status of the clock, see init()
+        """
         
         L = Link(a, b, state)
         self.links.append(L)
@@ -1829,74 +1891,16 @@ class Network():
         lons = [clo.lon for clo in self.clocks]
         return np.array(lons)
             
-    def h_N_2ff(self, effect_names):
-        """Convert elevation and geoid change to ff change for all clocks."""
-        
-        for effect_name in effect_names:
-            for clo in self.clocks:
-                effect = getattr(clo, effect_name)
-                effect['ff'] = clo.h2ff(effect['h']) + clo.N2ff(effect['N'])
-            
-    def to_file(self):
-        """Writes the clock info of all network clocks into netcdf and json
-        files."""
-        
-        for clo in self.clocks:
-            clo.to_file()
-
-    def plot(self, background='TerrainBackground'):
-        """Plots the network on top of a basemap.
-        
-        Deprecated!"""
-        
-        print('WARNING: This plot-function is deprecated. Use plotNetwork()'
-              + ' instead!')
-       
-        plt.rcParams.update({'font.size': 13})  # set before making the figure!        
-        # Clocks = Points
-        df = pd.DataFrame({'City': [], 'Country': [], 'Latitude': [],
-                           'Longitude': []})
-        for clo in self.clocks:
-            df = df.append([{'City': clo.location, 'Country': clo.country,
-                             'Latitude': clo.lat, 'Longitude': clo.lon}],
-                           ignore_index=True)
-        gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df.Longitude,
-                                                               df.Latitude))
-        gdf.crs = {'init': 'epsg:4326', 'no_defs': True}
-        gdf = gdf.to_crs(epsg=3857)
-        
-        # Links = LineStrings
-        df_links = pd.DataFrame({'From': [], 'To': [], 'length': []})
-        links = []
-        for l in self.links:
-            links.append(LineString([Point(l.a.lon, l.a.lat),
-                                     Point(l.b.lon, l.b.lat)]))
-            df_links = df_links.append([{'From': l.a.location,
-                                         'To': l.b.location,
-                                         'length': l.length()}])
-        gdf_links = gpd.GeoDataFrame(df_links, geometry=links)
-        gdf_links.crs = {'init': 'epsg:4326', 'no_defs': True}
-        gdf_links = gdf_links.to_crs(epsg=3857)
-        
-        # Plot
-        ax = gdf.plot(figsize=(10, 10), color='red', edgecolor='k')
-        gdf_links.plot(ax=ax, color='red')
-        for idx, row in gdf.iterrows():
-#            plt.annotate(s=row['City'], xy=(row.geometry.x, row.geometry.y))
-            plt.text(row.geometry.x+3e4, row.geometry.y, s=row['City'],
-                     bbox={'facecolor': 'white', 'alpha':0.8, 'pad': 2,
-                           'edgecolor':'none'})
-        if background == 'TerrainBackground':
-            ctx.add_basemap(ax, url=ctx.providers.Stamen.TerrainBackground) 
-        elif background == 'toner':
-            ctx.add_basemap(ax, url=ctx.providers.Stamen.TonerBackground)
-        elif background == 'night':
-            ctx.add_basemap(ax, url=ctx.providers.NASAGIBS.ViirsEarthAtNight2012)
-        
-        return gdf, gdf_links
-    
     def plotNetwork(self, zoom='close', save=False):
-        """."""
+        """Plots the network with gmt.
+        
+        Parameters
+        ----------
+        zoom: str, optional
+            enables 3 options for the zoom depth of the map
+        save: bool, optional
+            if True, save the figure as clonets_gmt.pdf
+        """
              
         if zoom == 'close':
             region = [0, 26, 44, 62]
@@ -1978,35 +1982,55 @@ class Network():
                 world=False):
         """Plots the earth system component signal on a map.
         
-        :param esc: earth system component
-        :type esc: str
-        :param t: point in time
-        :type t: datetime.datetime or str
-        :param unitFrom: unit in which the data is stored
-        :type unitFrom: str
-        :param unitTo: unit that is to be plotted
-        :type unitTo: str
-        :param t_ref: optional reference point in time
-        :type t_ref: datetime.datetime or str (must match t)
-        :return: the figure object
-        :rtype: pygmt.Figure
+        Parameters
+        ----------
+        t: datetime.datetime or str
+            point in time
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+        t_ref: datetime.datetime or str, optional
+            reference date
+        degreevariances: bool, optional
+            if True, just return converted spherical harmonics
+        lmin: int, optional
+            minimum spherical harmonic degree
+        lmax: int, optional
+            maximum spherical harmonic degree
+        world: bool, optional
+            if True, plots the whole world instead of only Europe
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        grid: sh.SHGrid
+            the grid that was plotted
         
-        Possible units:
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
             'U' ... geopotential [m^2/s^2]
             'N' ... geoid height [m]
-            'h' .... elevation [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
             'sd' ... surface density [kg/m^2]
             'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            'ff' ... fractional frequency [-]
-            'GRACE' ... geoid height [m], but with lmax=120 and filtered
+        'gravity'... [m/s^2]
             
-        Possible esc's:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
 #TODO: region not hardcoded but as parameter, possibly kwarg for plot_europe_720()
         
@@ -2094,37 +2118,53 @@ class Network():
     
     def plotESCatClocks(self, esc, t, unitFrom, unitTo, t_ref=None,
                         loc_ref=False, save=False, world=False):
-        """Plots the earth system component signal on a map.
+        """Plots the earth system component signal clockwise on a map.
         
-        :param esc: earth system component
-        :type esc: str
-        :param t: point in time
-        :type t: datetime.datetime or str
-        :param unitFrom: unit in which the data is stored
-        :type unitFrom: str
-        :param unitTo: unit that is to be plotted
-        :type unitTo: str
-        :param t_ref: optional reference point in time
-        :type t_ref: datetime.datetime or str (must match t)
-        :return: the figure object
-        :rtype: pygmt.Figure
+        Parameters
+        ----------
+        t: datetime.datetime or str
+            point in time
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+        t_ref: datetime.datetime or str, optional
+            reference date
+        loc_ref: str, optional
+            reference clock
+        world: bool, optional
+            if True, plots the whole world instead of only Europe
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        points: np.array of floats
+            the points that were plotted
         
-        Possible units:
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
             'U' ... geopotential [m^2/s^2]
             'N' ... geoid height [m]
-            'h' .... elevation [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
             'sd' ... surface density [kg/m^2]
             'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            'ff' ... fractional frequency [-]
-            'GRACE' ... geoid height [m], but with lmax=120 and filtered
+        'gravity'... [m/s^2]
             
-        Possible esc's:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         #TODO: region not hardcoded but as parameter
         
@@ -2227,57 +2267,70 @@ class Network():
 
         return fig, points
     
-    def plotRMS(self, T, esc, unitFrom, unitTo, reset=False, save=False,
+    def plotRMS(self, T, esc, unitFrom, unitTo, save=False,
                 trend=None, lmin=False, lmax=False, hourly=False):
-        """Plots the Root Mean Square on a map.
+        """Plots the Root Mean Square of the signal on a map.
         
         Expands the spherical harmonics from the data folder for each grid
         point and each time step. Then computes the root mean square error for
         each of the grid point time series.
 
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param save: shall the figure be saved
-        :type save: boolean
-        :param trend: shall a trend be subtracted
-        :type trend: str or odd int, optional
-        :return fig: the figure object
-        :rtype fig: pygmt.Figure
-        :return grid: the plottet data grid
-        :rtype grid: pyshtools.SHGrid
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+        trend: str or odd int, optional
+            shall a trend be subtracted?
+        lmin: int, optional
+            minimum spherical harmonic degree
+        lmax: int, optional
+            maximum spherical harmonic degree
+        hourly: bool, optional
+            extra option in case of a high resolution time series
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        grid: sh.SHGrid
+            the grid that was plotted
         
-        Possible trends:
+        Possible trends
+        ---------------
             'linear' ... just the linear trend
+            'annual' ... annual signal
+            'semiannual' ... semiannual signal
             'trend' ... trend is plotted instead of the RMS
             as number: width of the moving average filter, thus the cutoff
                        period length; has to be an odd integer
         
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-                'GRACE' ... geoid height [m], but with lmax=120 and filtered
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         esc_dict = {'I': 'oggm_',
@@ -2417,57 +2470,63 @@ class Network():
         
         return fig, grid
     
-    def plotRMS2(self, T, esc, unitFrom, unitTo, reset=False, save=False,
-                trend=None):
+    def plotRMS2(self, T, esc, unitFrom, unitTo, save=False, trend=None):
         """Plots the Root Mean Square on a map. Used for the "famous" picture.
         
         Expands the spherical harmonics from the data folder for each grid
         point and each time step. Then computes the root mean square error for
         each of the grid point time series.
 
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param save: shall the figure be saved
-        :type save: boolean
-        :param trend: shall a trend be subtracted
-        :type trend: str or odd int, optional
-        :return fig: the figure object
-        :rtype fig: pygmt.Figure
-        :return grid: the plottet data grid
-        :rtype grid: pyshtools.SHGrid
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+        trend: str or odd int, optional
+            shall a trend be subtracted?
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        grid: sh.SHGrid
+            the grid that was plotted
         
-        Possible trends:
+        Possible trends
+        ---------------
             'linear' ... just the linear trend
+            'annual' ... annual signal
+            'semiannual' ... semiannual signal
             'trend' ... trend is plotted instead of the RMS
             as number: width of the moving average filter, thus the cutoff
                        period length; has to be an odd integer
         
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-                'GRACE' ... geoid height [m], but with lmax=120 and filtered
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         esc_dict = {'I': 'oggm_',
@@ -2622,13 +2681,63 @@ class Network():
         
         return fig, grid
     
-    def plotRMSatClocks(self, T, esc, unitFrom, unitTo, reset=False,
-                        save=False, trend=None):
-        """Plots the Root Mean Square on a map.
+    def plotRMSatClocks(self, T, esc, unitFrom, unitTo, save=False, trend=None):
+        """Plots the Root Mean Square of the signal clockwise on a map.
         
         Expands the spherical harmonics from the data folder for each grid
         point and each time step. Then computes the root mean square error for
         each of the grid point time series.
+
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+        trend: str or odd int, optional
+            shall a trend be subtracted?
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        EUROPA_rms: np.array of floats
+            the grid that was plotted
+        
+        Possible trends
+        ---------------
+            'linear' ... just the linear trend
+            'annual' ... annual signal
+            'semiannual' ... semiannual signal
+            'trend' ... trend is plotted instead of the RMS
+            as number: width of the moving average filter, thus the cutoff
+                       period length; has to be an odd integer
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
 
         :param T: list of dates
         :type T: str or datetime.date(time)
@@ -2752,61 +2861,6 @@ class Network():
             fig.savefig(savename)
         
         return fig, EUROPA_rms
-            
-    def _plotTimeseries(self, kind, unit):
-        """Plots the timeseries of all clocks.
-        
-        DEPRECATED!
-        
-        Plots all clocks in one plot, takes a certain (or all summed up) signal
-        and unit to plot.
-        
-        :param kind:
-        :type kind: str
-        :param unit:
-        :type unit: str
-        
-        Possible units:
-            'U' ... geopotential [m^2/s^2]
-            'N' ... geoid height [m]
-            'h' .... elevation [m]
-            'sd' ... surface density [kg/m^2]
-            'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            'ff' ... fractional frequency [-]
-            
-        Possible kinds:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
-            'S' ... Solid Earth
-        """
-        #TODO: plot mean values?
-        plt.rcParams.update({'font.size': 13})  # set before making the figure!
-        fig, ax = plt.subplots(figsize=(10, 10))
-        for clo in self.clocks:
-            try:
-                effect =  getattr(clo, kind)
-                data = effect[unit]
-                t = effect['t']
-                ax.plot(t, data, label=clo.location)
-            except:
-                print('Clock in ' + clo.location + ' does not have information'
-                      + ' from ' + kind + ' about ' + unit)
-        ax.set_xlabel('time [y]')
-        unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
-                     'N': 'Geoid height [m]',
-                     'h': 'Elevation [m]',
-                     'sd': 'Surface Density [kg/m$^2$]',
-                     'ewh': 'Equivalent water height [m]',
-                     'gravitational': 'gravitational acceleration [m/s$^2$]',
-                     'ff': 'Fractional frequency [-]'}
-        ax.set_ylabel(unit_dict[unit])
-        ax.grid()
-        ax.legend()
-        plt.tight_layout()
         
     def plotTimeseries(self, T, esc, unitFrom, unitTo, loc=False, loc_ref=False,
                        save=False, **kwargs):
@@ -2814,36 +2868,47 @@ class Network():
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time)
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        loc: list of str, optional
+            clock locations to be plotted
+        loc_ref: str, optional
+            reference clock
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -2924,36 +2989,51 @@ class Network():
         
         Uses sh2timeseries() for all clocks and plots the resulting timeseries.
         
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str 
-        :param t_ref: reference time for the series
-        :type t_ref: str or datetime.date(time)
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        delta_t: float
+            time between consecutive data points
+        loc: list of str, optional
+            clock locations to be plotted
+        loc_ref: str, optional
+            reference clock
+        fmax: float
+            maximum frequency to be plotted
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
             
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -2963,6 +3043,7 @@ class Network():
                     'ewh': 'Equivalent water height [m]',
                     'gravity': 'gravitational acceleration [m/s$^2$]',
                     'ff': 'Fractional frequency [-]'}
+        
         np.random.seed(7)
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
@@ -3032,6 +3113,49 @@ class Network():
 
     def plotErrorTimeseries(self, esc, unitFrom, unitTo, loc, monthly=False,
                             save=False):
+        """Plots a time series including GRACE and clock error ranges.
+        
+        Used for the Schröder et al. (2021) Fig. 15.
+        
+        Parameters
+        ----------
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        loc: str
+            clock location to be plotted
+        monthly: bool, optional
+            if True, only the monthly signal is plotted
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+            
+        Returns
+        -------
+        basically all relevant information for the plot
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
+        """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
                     'N': 'Geoid height [mm]',
@@ -3161,7 +3285,31 @@ class Network():
                 np.array([s_grace1, s_grace2, s_grace3]))
         
     def plot_world_720(self, grid, path, trend, esc, unitTo, cb_dict,
-                        inp_func, t):
+                        inp_func):
+        """Helper function for plotting on world map.
+        
+        Parameters
+        ----------
+        grid: sh.SHGrid
+            grid to be plotted
+        path: str
+            path to the save location
+        trend: str
+            leads to different colormaps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitTo: str
+            unit of the plotted signal
+        cb_dict: dictionary
+            colorbar label dictionary
+        inp_func: str
+            leads to a different colormap
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the plotted figure object
+        """
         
         x = grid.lons()
         y = grid.lats()
@@ -3200,7 +3348,31 @@ class Network():
 
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
-                        inp_func, t):
+                        inp_func):
+        """Helper function for plotting on Europe map.
+        
+        Parameters
+        ----------
+        grid: sh.SHGrid
+            grid to be plotted
+        path: str
+            path to the save location
+        trend: str
+            leads to different colormaps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitTo: str
+            unit of the plotted signal
+        cb_dict: dictionary
+            colorbar label dictionary
+        inp_func: str
+            leads to a different colormap
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the plotted figure object
+        """
 #TODO: region as parameter
         
         x = grid.lons()
