@@ -236,13 +236,15 @@ class Clock():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'I_scandinavia': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_', 
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
         
         # TODO: Check whether the timeseries is already there
@@ -381,13 +383,15 @@ class Clock():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'I_scandinavia': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_', 
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
         
         # TODO: Check whether the timeseries is already there
@@ -489,6 +493,7 @@ class Clock():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         np.random.seed(7)
@@ -609,6 +614,7 @@ class Clock():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         np.random.seed(7)
@@ -725,12 +731,14 @@ class Clock():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_'}
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"RMS of Geoid height [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -1022,6 +1030,7 @@ class Link():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         np.random.seed(7)
@@ -1167,6 +1176,7 @@ class Link():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -1252,6 +1262,7 @@ class Link():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         np.random.seed(7)
@@ -1401,6 +1412,8 @@ class Network():
         Plots the Root Mean Square on a map. Used for the "famous" picture.
     plotRMSatClocks():
         Plots the Root Mean Square of the signal clockwise on a map.
+    mean_clock():
+        Computes a mean clock for the network.
     plotTimeseries():
         Plots time series at each clock location.
     plotTimeFrequencies():
@@ -1667,6 +1680,7 @@ class Network():
             print('Network name not found! Network empty!')
         
         if region:
+            self.region = region
             if region == 'eu_atlantic':
                 poly = Polygon([(-32, 70),  # (lon, lat)
                                (-32, 27),
@@ -1757,7 +1771,7 @@ class Network():
             else:
                 print('Wrong region name during Network initialization!')
 
-            for i in np.arange(len(self.clocks)-1, 0, -1):
+            for i in np.arange(len(self.clocks)-1, -1, -1):
                 print(i)
                 if not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly):
                     del self.clocks[i]
@@ -2031,6 +2045,7 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
 #TODO: region not hardcoded but as parameter, possibly kwarg for plot_europe_720()
         
@@ -2048,6 +2063,7 @@ class Network():
                     'H_snow': 'clm_tws_',
                     'A': 'coeffs_',
                     'O': 'O_',
+                    'AOHIS': 'AOHIS_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
 
         path = cfg.PATHS['data_path']
@@ -2165,6 +2181,7 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         #TODO: region not hardcoded but as parameter
         
@@ -2181,6 +2198,7 @@ class Network():
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
                     'O': 'O_',
+                    'AOHIS': 'AOHIS_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
 
         path = cfg.PATHS['data_path']
@@ -2267,7 +2285,7 @@ class Network():
 
         return fig, points
     
-    def plotRMS(self, T, esc, unitFrom, unitTo, save=False,
+    def plotRMS(self, T, esc, unitFrom, unitTo, save=False, world=False,
                 trend=None, lmin=False, lmax=False, hourly=False):
         """Plots the Root Mean Square of the signal on a map.
         
@@ -2287,6 +2305,8 @@ class Network():
             unit of the output timeseries
         save: str, optional
             if True, save the plot as 'png' or 'pdf'
+        world: bool, optional
+            if True, plot a world map instead of only Europe
         trend: str or odd int, optional
             shall a trend be subtracted?
         lmin: int, optional
@@ -2331,12 +2351,14 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_'}
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -2372,11 +2394,16 @@ class Network():
         path = cfg.PATHS['data_path'] + esc + '/'
         f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
         grid = f_lm.pad(720).expand()
-        y = np.arange(int(grid.nlat/10), int(grid.nlat/3))
-        x_east = np.arange(int(grid.nlon/6))
-        x_west = np.arange(int(grid.nlon/20*19), grid.nlon)
-        europe = np.zeros((len(y), len(x_west)+len(x_east)))
-        EUROPA = []
+        if world:
+            wo = np.zeros(np.shape(grid))
+            WORLD = []
+        else:
+            y = np.arange(int(grid.nlat/10), int(grid.nlat/2))
+            x_east = np.arange(int(grid.nlon/6))
+            x_west = np.arange(int(grid.nlon/20*18), grid.nlon)
+            europe = np.zeros((len(y), len(x_west)+len(x_east)))
+            EUROPA = []
+            
         for t in T:
             f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
             f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
@@ -2388,11 +2415,18 @@ class Network():
                 elif lmin and lmax:
                     f_lm = f_lm.pad(lmax).pad(720) - f_lm.pad(lmin).pad(720)
             grid = f_lm.pad(720).expand()
-            europe[:, :len(x_west)] = grid.data[y, x_west[0]:]
-            europe[:, len(x_west):] = grid.data[y, :len(x_east)]
-            EUROPA.append(copy.copy(europe))
+            if world:
+                wo = grid.data
+                WORLD.append(copy.copy(wo))
+            else:
+                europe[:, :len(x_west)] = grid.data[y, x_west[0]:]
+                europe[:, len(x_west):] = grid.data[y, :len(x_east)]
+                EUROPA.append(copy.copy(europe))
             print(t)
-        EUROPA = np.array(EUROPA)  # 365er liste mit ~500x400 arrays
+        if world:
+            EUROPA = np.array(WORLD)  # yes, here the naming becomes really bad.
+        else:
+            EUROPA = np.array(EUROPA)  # 365er liste mit ~500x400 arrays
         
         EUROPA_rms = np.zeros((np.shape(EUROPA)[1:]))
         EUROPA_coef = np.zeros((np.shape(EUROPA)[1:]))
@@ -2435,18 +2469,25 @@ class Network():
                     EUROPA_rms[i, j] = utils.rms(filtered)
                 else:
                     EUROPA_rms[i, j] = utils.rms(EUROPA[:, i, j])
-            print(i)
+            # print(i)
         
         # grid.data = np.zeros((np.shape(grid.data)))
         data = np.zeros((np.shape(grid.data)))
-        data[y, x_west[0]:] = EUROPA_rms[:, :len(x_west)]
-        data[y, :len(x_east)] = EUROPA_rms[:, len(x_west):]
+        if world:
+            data = EUROPA_rms
+        else:
+            data[y, x_west[0]:] = EUROPA_rms[:, :len(x_west)]
+            data[y, :len(x_east)] = EUROPA_rms[:, len(x_west):]
         if unitTo in('N', 'h', 'GRACE'):
             data = data * 1e3
         grid.data = data
         
-        fig = self.plot_europe_720(grid, path, trend, esc, unitTo, cb_dict,
-                                   'rms', '')
+        if world:
+            fig = self.plot_world_720(grid, path, trend, esc, unitTo, cb_dict,
+                                      'rms')
+        else:
+            fig = self.plot_europe_720(grid, path, trend, esc, unitTo, cb_dict,
+                                       'rms')
         
         if save:
             savepath = path + '../../fig/'
@@ -2527,12 +2568,14 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_'}
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"Geoid height variability [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -2681,7 +2724,8 @@ class Network():
         
         return fig, grid
     
-    def plotRMSatClocks(self, T, esc, unitFrom, unitTo, save=False, trend=None):
+    def plotRMSatClocks(self, T, esc, unitFrom, unitTo, save=False, trend=None,
+                        mean_clock=False, world=False):
         """Plots the Root Mean Square of the signal clockwise on a map.
         
         Expands the spherical harmonics from the data folder for each grid
@@ -2702,6 +2746,11 @@ class Network():
             if True, save the plot as 'png' or 'pdf'
         trend: str or odd int, optional
             shall a trend be subtracted?
+        mean_clock: bool, optional
+            if yes, creates a "mean" clock of the whole network and computes
+            the RMS with respect to this clock
+        world: bool, optional
+            if True, plots the whole world instead of only Europe
             
         Returns
         -------
@@ -2738,55 +2787,14 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
-
-        :param T: list of dates
-        :type T: str or datetime.date(time)
-        :param esc: earth system component
-        :type esc: str
-        :param unitFrom: unit of the input coefficients
-        :type unitFrom: str
-        :param unitTo: unit of the timeseries
-        :type unitTo: str
-        :param reset: shall the timeseries be calculated again
-        :type reset: boolean, optional
-        :param save: shall the figure be saved
-        :type save: boolean
-        :param trend: shall a trend be subtracted
-        :type trend: str or odd int, optional
-        :return fig: the figure object
-        :rtype fig: pygmt.Figure
-        :return grid: the plottet data grid
-        :rtype grid: pyshtools.SHGrid
-        
-        Possible trends:
-            'linear' ... just the linear trend
-            as number: width of the moving average filter, thus the cutoff
-                       period length; has to be an odd integer
-        
-        Possible units:
-            'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
-                'U' ... geopotential [m^2/s^2]
-                'N' ... geoid height [m]
-                'GRACE' ... geoid height [m], but with lmax=120 and filtered
-            'h' ... elevation [m]
-            'ff' ... fractional frequency [-]
-            'mass' ... dimensionless surface loading coeffs
-                'sd' ... surface density [kg/m^2]
-                'ewh' ... equivalent water height [m]
-            'gravity'... [m/s^2]
-            
-        Possible earth system components:
-            'I' ... Ice
-            'H' ... Hydrology
-            'A' ... Atmosphere
-            'O' ... Ocean
-            'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         esc_dict = {'I': 'oggm_',
                     'H': 'clm_tws_',
                     'A': 'coeffs_',
-                    'O': 'O_'}
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
                    'N': '"RMS of Geoid height [mm]"',
                    'h': '"RMS of Elevation [mm]"',
@@ -2796,7 +2804,17 @@ class Network():
                    'ff': '"RMS of Fractional frequency [-]"',
                    'GRACE': '"RMS of Geoid height [mm]"'}
         
-        T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # # make strings if time is given in datetime objects
+        # if not isinstance(T[0], str):
+        #     T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        if isinstance(T[0], str):
+            T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        try:
+            T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        except: 
+            T_frac = np.array([utils.datetime2frac(t) for t in T])
         # make strings if time is given in datetime objects
         if not isinstance(T[0], str):
             T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
@@ -2811,6 +2829,9 @@ class Network():
             EUROPA.append(copy.copy(points))
             print(t)
         EUROPA = np.array(EUROPA)  # 365er-liste mit ~20er arrays
+        
+        if mean_clock:  #TODO: only works without trend right now.
+            c_mean = np.array([np.mean(x) for x in EUROPA])
             
         EUROPA_rms = np.zeros((np.shape(EUROPA)[1]))
         # EUROPA_coef = np.zeros((np.shape(EUROPA)[1]))
@@ -2831,25 +2852,50 @@ class Network():
                 filtered = EUROPA[:, i] - utils.ma(EUROPA[:, i], trend)
                 EUROPA_rms[i] = utils.rms[filtered]
             else:
-                EUROPA_rms[i] = utils.rms(EUROPA[:, i])
+                if mean_clock:
+                    EUROPA_rms[i] = utils.rms(EUROPA[:, i], c_mean)
+                else:
+                    EUROPA_rms[i] = utils.rms(EUROPA[:, i])
         
         if unitTo in('N', 'h', 'GRACE'):
             EUROPA_rms = EUROPA_rms * 1e3
         datamax = np.max(abs(EUROPA_rms))
+        # datamax = 3.3
         
         data = {'data': EUROPA_rms, 'lat': self.lats(), 'lon': self.lons()}
         df = pd.DataFrame(data)
         
         fig = pygmt.Figure()
-        pygmt.makecpt(cmap='drywet', series=[0, datamax])
-        fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
-                  frame="a", shorelines="1/0.1p,black",
-                  borders="1/0.1p,black")
-        fig.plot(x=df.lon, y=df.lat, style='c0.1i', color=df.data/datamax,
-                 cmap='drywet')
+        with pygmt.clib.Session() as session:
+            if world:
+                session.call_module('gmtset', 'FONT 15p')
+            else:
+                session.call_module('gmtset', 'FONT 20p')
+        pygmt.makecpt(cmap='viridis', reverse=True, series=[0, datamax])
+        if world:
+            fig.coast(projection="R15c", region="d", frame=["a", "WSne"],
+                      shorelines="1/0.1p,black", borders="1/0.1p,black",
+                      land='grey')
+        else:
+            region = [-30, 30, 20, 70]
+            fig.coast(region=region, projection="S0/90/6i",
+                      frame=["ag", "WSne"], shorelines="1/0.1p,black",
+                      borders="1/0.1p,black", land='grey')
+            # fig.coast(region=[-30, 30, 25, 70], projection="S0/90/6i",
+            #           frame="a", shorelines="1/0.1p,black",
+            #           borders="1/0.1p,black")
+        fig.plot(x=df.lon, y=df.lat, style='c0.1i', color=1-df.data/datamax,
+                 cmap='viridis')
+        with pygmt.clib.Session() as session:
+            if world:
+                session.call_module('gmtset', 'FONT 18p')
+            else:
+                session.call_module('gmtset', 'FONT 24p')     
         # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
         # fig.colorbar(position='JMR', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
-        fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        cbar_pos = 'g' + str(region[1]-2) + '/' + str(region[2]-10) + '+w13c/0.5c'
+        fig.colorbar(position=cbar_pos, frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        # fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
 
         if save:
             savepath = path + '../../fig/'
@@ -2861,6 +2907,218 @@ class Network():
             fig.savefig(savename)
         
         return fig, EUROPA_rms
+    
+    def mean_clock(self, T, esc, unitFrom, unitTo):
+        """Computes a mean clock for the network.
+        
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+            
+        Returns
+        -------
+        c_mean: np.array of floats
+            mean clock time series
+        c_mean_loc: np.array of floats [2x1]
+            [lat, lon] of the mean clock
+        
+        Possible trends
+        ---------------
+            'linear' ... just the linear trend
+            'annual' ... annual signal
+            'semiannual' ... semiannual signal
+            'trend' ... trend is plotted instead of the RMS
+            as number: width of the moving average filter, thus the cutoff
+                       period length; has to be an odd integer
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
+        """
+        
+        esc_dict = {'I': 'oggm_',
+                    'H': 'clm_tws_',
+                    'A': 'coeffs_',
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
+        cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
+                   'N': '"RMS of Geoid height [mm]"',
+                   'h': '"RMS of Elevation [mm]"',
+                   'sd': '"RMS of Surface Density [kg/m@+2@+]"',
+                   'ewh': '"RMS of Equivalent water height [m]"',
+                   'gravitational': '"RMS of gravitational acceleration [m/s@+2@+]"',
+                   'ff': '"RMS of Fractional frequency [-]"',
+                   'GRACE': '"RMS of Geoid height [mm]"'}
+        
+        # T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # # make strings if time is given in datetime objects
+        # if not isinstance(T[0], str):
+        #     T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        if isinstance(T[0], str):
+            T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        try:
+            T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        except: 
+            T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # make strings if time is given in datetime objects
+        if not isinstance(T[0], str):
+            T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        path = cfg.PATHS['data_path'] + esc + '/'
+        all_clocks = []
+        for t in T:
+            f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+            points = np.array(
+                [f_lm.expand(lat=clo.lat, lon=clo.lon) for clo in self.clocks])
+            all_clocks.append(copy.copy(points))
+            print(t)
+        all_clocks = np.array(all_clocks)  # 365er-liste mit ~20er arrays
+        c_mean = np.array([np.mean(x) for x in all_clocks])
+        c_mean_lat = np.mean([c.lat for c in self.clocks])
+        temp = np.array([c.lon for c in self.clocks])
+        if self.region == 'oceania':
+            temp[temp < 0] += 360
+        c_mean_lon = np.mean(temp)
+        c_mean_loc = np.array([c_mean_lat, c_mean_lon])
+        
+        return c_mean, c_mean_loc
+    
+    def plotTimeseriesAndMean(self, T, esc, unitFrom, unitTo, save=False):
+        """Makes a time series plot of the mean clock and all other clocks.
+
+        Parameters
+        ----------
+        T: list of str or datetime.datetime
+            time stamps
+        esc: str
+            earth system component (Ice, Atmosphere, Hydrology, Ocean)
+        unitFrom: str
+            unit of the input coefficients
+        unitTo: str
+            unit of the output timeseries
+        save: str, optional
+            if True, save the plot as 'png' or 'pdf'
+            
+        Returns
+        -------
+        fig: pygmt.Figure
+            the created figure object
+        EUROPA_rms: np.array of floats
+            the grid that was plotted
+        
+        Possible units
+        --------------
+        'pot' ... dimensionless Stokes coeffs (e.g. GRACE L2)
+            'U' ... geopotential [m^2/s^2]
+            'N' ... geoid height [m]
+        'h' ... elevation [m]
+        'ff' ... fractional frequency [-]
+        'mass' ... dimensionless surface loading coeffs
+            'sd' ... surface density [kg/m^2]
+            'ewh' ... equivalent water height [m]
+        'gravity'... [m/s^2]
+            
+        Possible earth system components
+        --------------------------------
+        'I' ... Ice
+        'H' ... Hydrology
+        'A' ... Atmosphere
+        'O' ... Ocean
+        'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
+        """
+        
+        esc_dict = {'I': 'oggm_',
+                    'H': 'clm_tws_',
+                    'A': 'coeffs_',
+                    'O': 'O_',
+                    'AOHIS': 'AOHIS_'}
+        unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
+                    'N': 'Geoid height [mm]',
+                    'GRACE': 'Geoid height [mm]',
+                    'h': 'Elevation [mm]',
+                    'sd': 'Surface Density [kg/m$^2$]',
+                    'ewh': 'Equivalent water height [m]',
+                    'gravity': 'gravitational acceleration [m/s$^2$]',
+                    'ff': 'Fractional frequency [-]'}
+        
+        # T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # # make strings if time is given in datetime objects
+        # if not isinstance(T[0], str):
+        #     T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        if isinstance(T[0], str):
+            T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        try:
+            T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        except: 
+            T_frac = np.array([utils.datetime2frac(t) for t in T])
+        # make strings if time is given in datetime objects
+        if not isinstance(T[0], str):
+            T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
+        
+        path = cfg.PATHS['data_path'] + esc + '/'
+        data = []
+        for t in T:
+            f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + t)
+            f_lm = harmony.sh2sh(f_lm, unitFrom, unitTo)
+            points = np.array(
+                [f_lm.expand(lat=clo.lat, lon=clo.lon) for clo in self.clocks])
+            data.append(copy.copy(points))
+            print(t)
+        data = np.array(data)  # 365er-liste mit ~20er arrays
+        
+        c_mean = np.array([np.mean(x) for x in data])
+        
+        if unitTo in('N', 'h', 'GRACE'):
+            data = data * 1e3
+            c_mean = c_mean * 1e3
+            
+        plt.rcParams.update({'font.size': 13})  # set before making the figure!        
+        fig, ax = plt.subplots()
+        T = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
+             'Oct', 'Nov', 'Dec', ]
+        plt.plot(T, c_mean, color='tab:blue', linewidth=2, zorder=5)
+        plt.plot(T, data, color='tab:orange', linewidth=0.5)
+        plt.ylabel(unit_dict[unitTo])
+        plt.xticks(rotation=90)
+        plt.title(self.region)
+        plt.grid()
+        plt.legend(['mean clock', 'clocks'])#bbox_to_anchor=(1., 1.))
+        plt.tight_layout()
+        
+        path = (cfg.PATHS['fig_path'] + 'timeseries/mean_clock.pdf')
+        if save:
+            plt.savefig(path)
+        
+        return fig, data, c_mean
+            
         
     def plotTimeseries(self, T, esc, unitFrom, unitTo, loc=False, loc_ref=False,
                        save=False, **kwargs):
@@ -2909,6 +3167,7 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -3034,6 +3293,7 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -3155,6 +3415,7 @@ class Network():
         'A' ... Atmosphere
         'O' ... Ocean
         'GIA'.. Glacial Isostatic Adjustment
+        'AOHIS' ESA-ESM Atmosphere, Ocean, Hydrology, Ice, and Solid Earth
         """
         
         unit_dict = {'U': 'gravitational potential [m$^2$/s$^2$]',
@@ -3285,7 +3546,7 @@ class Network():
                 np.array([s_grace1, s_grace2, s_grace3]))
         
     def plot_world_720(self, grid, path, trend, esc, unitTo, cb_dict,
-                        inp_func):
+                        inp_func=False):
         """Helper function for plotting on world map.
         
         Parameters
@@ -3302,7 +3563,7 @@ class Network():
             unit of the plotted signal
         cb_dict: dictionary
             colorbar label dictionary
-        inp_func: str
+        inp_func: str, optional
             leads to a different colormap
             
         Returns
@@ -3315,7 +3576,7 @@ class Network():
         y = grid.lats()
         datamax = np.max(abs(grid.data))
         print(datamax)
-        datamax = 4  # WATCH OUT
+        # datamax = 4  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -3348,7 +3609,7 @@ class Network():
 
         
     def plot_europe_720(self, grid, path, trend, esc, unitTo, cb_dict,
-                        inp_func):
+                        inp_func=False):
         """Helper function for plotting on Europe map.
         
         Parameters
@@ -3365,7 +3626,7 @@ class Network():
             unit of the plotted signal
         cb_dict: dictionary
             colorbar label dictionary
-        inp_func: str
+        inp_func: str, optional
             leads to a different colormap
             
         Returns
@@ -3377,12 +3638,13 @@ class Network():
         
         x = grid.lons()
         y = grid.lats()
-        # find out what the datalimits are within the shown region
+        # find out what the datalimits are within the shown region:
+#TODO: HARDCODED to the region [-10, 30, 40, 65]
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
         print(datamax)
-        datamax = 4  # WATCH OUT
+        # datamax = 4  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -3397,22 +3659,24 @@ class Network():
             pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
         else:
             pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
-        # fig.grdimage(path + '../temp/pygmt.nc', region=[-10, 30, 40, 65],
+        region = [-30, 30, 20, 70]
+        # fig.grdimage(path + '../temp/pygmt.nc', region=region,
         #              projection="S10/90/6i", frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
-        fig.grdimage(path + '../temp/pygmt.nc', region=[-30, 30, 20, 75],
+        fig.grdimage(path + '../temp/pygmt.nc', region=region,
                      projection="S0/90/6i", frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
         if (esc == 'H' or esc == 'I') and unitTo == 'ewh':
-            fig.coast(region=[-10, 30, 40, 65], projection="S10/90/6i",
+            fig.coast(region=region, projection="S0/90/6i",
                       shorelines="1/0.1p,black",
                       borders="1/0.1p,black", water='white')
         else:
-            fig.coast(region=[-30, 30, 20, 75], projection="S0/90/6i",
+            fig.coast(region=region, projection="S0/90/6i",
                       shorelines="1/0.1p,black",
                       borders="1/0.1p,black")
         fig.plot(self.lons(), self.lats(), style="c0.07i", color="white",
                  pen="black")
         with pygmt.clib.Session() as session:
             session.call_module('gmtset', 'FONT 24p')
-        fig.colorbar(position='g29/12+w13c/0.5c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        cbar_pos = 'g' + str(region[1]-2) + '/' + str(region[2]-10) + '+w13c/0.5c'
+        fig.colorbar(position=cbar_pos, frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         
         return fig

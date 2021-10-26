@@ -31,7 +31,7 @@ import colorednoise as cn
 cfg.configure()
 
 # Clock initialisation --------------------------------------------------------
-CLONETS = Network('psmsl_only', region='eu_atlantic')
+CLONETS = Network('psmsl_only', region='asia_pacific')
 print(CLONETS)
 
 # Plot network with pyGMT -----------------------------------------------------
@@ -50,7 +50,7 @@ print(CLONETS)
 
 # virginiakey = CLONETS.search_clock('location', 'VIRGINIA KEY, FL')[0]
 # barcelona = CLONETS.search_clock('location', 'BARCELONA')[0]
-dunkerque = CLONETS.search_clock('location', 'DUNKERQUE')[0]
+# dunkerque = CLONETS.search_clock('location', 'DUNKERQUE')[0]
 
 # # Hourly datetime timeseries --------------------------------------------------
 # T = [datetime.datetime(2007, 1, d) for d in range(1, 32)]
@@ -105,13 +105,21 @@ unitTo = 'N'
 #                                save=False, t_ref=t_ref)
 
 # # Plot Root Mean Square -------------------------------------------------------
-# fig, data = CLONETS.plotRMS(T, 'H', 'ewh', 'ewh', save=True, hourly=False,
-#                             trend=31)
-# fig.show()
+fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=False)
+fig.show()
+
+fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=True,
+                                    world=False, save=False)
+fig.show()
+fig, data, c_mean = CLONETS.plotTimeseriesAndMean(T, 'O', 'pot', 'N',
+                                                  save=False)
+
+# c_mean, c_mean_loc = CLONETS.mean_clock(T, 'O', 'pot', 'N')
 
 # # Plot Root Mean Square for public --------------------------------------------
 # fig, data = CLONETS.plotRMS2(T, 'H', 'ewh', 'ewh', save=True, trend=31)
 # fig.show()
+
 
 # # Plot Earth System Component -------------------------------------------------
 # unitTo = 'N'

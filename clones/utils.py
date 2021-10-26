@@ -104,7 +104,8 @@ def rms(x, y=None):
     
     Has the option of computing the root mean square error/difference between
     two arrays. Be aware: If you have two time series, use x and y, do not just
-    parse x-y!
+    parse x-y! If you do the latter, it will ignore the constant offset between
+    x and y and just compute the std of the difference time series.
     
     Parameters
     ----------
