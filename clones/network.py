@@ -884,6 +884,9 @@ class Link():
         """Instanciates a fibre link between two clocks a and b."""
         
         self.state = state
+        self.a = a
+        self.b = b
+        self.name = a.location + ' --- ' + b.location
         
     def __repr__(self):
         """To be printed if instance is written."""
@@ -1759,7 +1762,7 @@ class Network():
                 # cp_df.loc[0, 'geometry'] = poly
                 # cp_df.to_file('../data/oceania.json', driver='GeoJSON')
                 for i in np.arange(len(self.clocks)-1, 0, -1):
-                    print(i)
+                    # print(i)
                     if (not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly) and
                         not Point(self.clocks[i].lon, self.clocks[i].lat).within(poly2)):
                         del self.clocks[i]
@@ -2355,12 +2358,14 @@ class Network():
         """
         
         esc_dict = {'I': 'oggm_',
-                    'H': 'clm_tws_',
-                    'A': 'coeffs_',
+                    # 'H': 'clm_tws_',
+                    'H': 'H_',
+                    # 'A': 'coeffs_',
+                    'A': 'A_',
                     'O': 'O_',
                     'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
-                   'N': '"Geoid height variability [mm]"',
+                   'N': '"RMS of Geoid height [mm]"',
                    'h': '"RMS of Elevation [mm]"',
                    'sd': '"RMS of Surface Density [kg/m@+2@+]"',
                    'ewh': '"Mass variability in EWH [m]"',
@@ -2594,11 +2599,16 @@ class Network():
                          'ff': '"Fractional frequency [-]"',
                          'GRACE': '"Geoid height [mm]"'}
         
-        T_frac = np.array([utils.datetime2frac(t) for t in T])
+        if isinstance(T[0], str):
+            T_frac = [datetime.datetime.strptime(t, '%Y_%m') for t in T]
+        try:
+            T_frac = np.array([utils.datetime2frac(t) for t in T_frac])
+        except: 
+            T_frac = np.array([utils.datetime2frac(t) for t in T])
         # make strings if time is given in datetime objects
         if not isinstance(T[0], str):
             T = [datetime.datetime.strftime(t, format='%Y_%m_%d') for t in T]
-        
+
         path = cfg.PATHS['data_path'] + esc + '/'
         f_lm = harmony.shcoeffs_from_netcdf(path + esc_dict[esc] + T[0])
         grid = f_lm.pad(720).expand()
@@ -2694,32 +2704,38 @@ class Network():
             fig.coast(region=[-15, 40, 40, 65], projection="M10i",
                       shorelines="1/0.1p,black",
                       borders="1/0.2p,black")
-        nmis = [0, 5, 6, 7, 9, 10, 12, 11, 13, 15, 17, 18]
-        nmi_links = []
-        for i, i2 in zip(nmis[:-1], nmis[1:]):
-            self.add_link(self.clocks[i], self.clocks[i2], 8)
-        self.add_link(self.clocks[nmis[-1]], self.clocks[nmis[0]], 8)
-        for l in self.links:
-            x = [l.a.lon, l.b.lon]
-            y = [l.a.lat, l.b.lat]
-            if l.state == 8:
-                fig.plot(x, y, pen="3p,red")
-        fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
-                 pen="black")
+        # nmis = [0, 5, 6, 7, 9, 10, 12, 11, 13, 15, 17, 18]
+        # nmi_links = []
+        # for i, i2 in zip(nmis[:-1], nmis[1:]):
+        #     self.add_link(self.clocks[i], self.clocks[i2], 8)
+        # self.add_link(self.clocks[nmis[-1]], self.clocks[nmis[0]], 8)
+        # for l in self.links:
+        #     x = [l.a.lon, l.b.lon]
+        #     y = [l.a.lat, l.b.lat]
+        #     if l.state == 8:
+        #         fig.plot(x, y, pen="3p,red")
+        # fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
+        #           pen="black")
+        # if save:
+        #     savepath = path + '../../fig/'
+        #     savename = savepath + 'openlichkeitswork3.pdf'
+        #     fig.savefig(savename)
+            
+        # for l in self.links:
+        #     x = [l.a.lon, l.b.lon]
+        #     y = [l.a.lat, l.b.lat]
+        #     if l.state == 8:
+        #         fig.plot(x, y, pen="4p,red")
+        # fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
+        #           pen="black")
+        # if save:
+        #     savename = savepath + 'openlichkeitswork4.pdf'
+        #     fig.savefig(savename)
+        fig.plot(self.lons(), self.lats(), style="c0.15i", color="blue",
+                  pen=False)
         if save:
             savepath = path + '../../fig/'
-            savename = savepath + 'openlichkeitswork3.pdf'
-            fig.savefig(savename)
-            
-        for l in self.links:
-            x = [l.a.lon, l.b.lon]
-            y = [l.a.lat, l.b.lat]
-            if l.state == 8:
-                fig.plot(x, y, pen="4p,red")
-        fig.plot(self.lons()[nmis], self.lats()[nmis], style="c0.45i", color="white",
-                 pen="black")
-        if save:
-            savename = savepath + 'openlichkeitswork4.pdf'
+            savename = savepath + 'openlichkeitswork5.pdf'
             fig.savefig(savename)
         
         return fig, grid
@@ -2860,7 +2876,7 @@ class Network():
         if unitTo in('N', 'h', 'GRACE'):
             EUROPA_rms = EUROPA_rms * 1e3
         datamax = np.max(abs(EUROPA_rms))
-        # datamax = 3.3
+        # datamax = 5
         
         data = {'data': EUROPA_rms, 'lat': self.lats(), 'lon': self.lons()}
         df = pd.DataFrame(data)
@@ -2893,8 +2909,11 @@ class Network():
                 session.call_module('gmtset', 'FONT 24p')     
         # fig.colorbar(frame=['paf+lewh', 'y+l:m'])  # @+x@+ for ^x
         # fig.colorbar(position='JMR', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
-        cbar_pos = 'g' + str(region[1]-2) + '/' + str(region[2]-10) + '+w13c/0.5c'
-        fig.colorbar(position=cbar_pos, frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        if world:
+            fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+        else:
+            cbar_pos = 'g' + str(region[1]-2) + '/' + str(region[2]-10) + '+w13c/0.5c'
+            fig.colorbar(position=cbar_pos, frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
         # fig.colorbar(frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
 
         if save:
@@ -2904,6 +2923,7 @@ class Network():
                                      + '_clockwise_RMS.pdf'))
             if trend == 'linear':
                 savename = savename[:-4] + '_detrended.pdf'
+            print(savename)
             fig.savefig(savename)
         
         return fig, EUROPA_rms
@@ -3009,7 +3029,8 @@ class Network():
         
         return c_mean, c_mean_loc
     
-    def plotTimeseriesAndMean(self, T, esc, unitFrom, unitTo, save=False):
+    def plotTimeseriesAndMean(self, T, esc, unitFrom, unitTo, display_mean=True,
+                              two=False, vmin=False, vmax=False, save=False):
         """Makes a time series plot of the mean clock and all other clocks.
 
         Parameters
@@ -3022,6 +3043,8 @@ class Network():
             unit of the input coefficients
         unitTo: str
             unit of the output timeseries
+        display_mean: bool, optional
+            if False, just plots the difference time series w.r.t. the mean
         save: str, optional
             if True, save the plot as 'png' or 'pdf'
             
@@ -3100,17 +3123,51 @@ class Network():
             data = data * 1e3
             c_mean = c_mean * 1e3
             
+        if two:
+            path2 = cfg.PATHS['data_path'] + 'O/'
+            data2 = []
+            for t in T:
+                f_lm2 = harmony.shcoeffs_from_netcdf(path2 + 'O_' + t)
+                f_lm2 = harmony.sh2sh(f_lm2, unitFrom, unitTo)
+                points2 = np.array(
+                    [f_lm2.expand(lat=clo.lat, lon=clo.lon) for clo in self.clocks])
+                data2.append(copy.copy(points2))
+                print(t)
+            data2 = np.array(data2)  # 365er-liste mit ~20er arrays
+            
+            c_mean2 = np.array([np.mean(x) for x in data2])
+            
+            if unitTo in('N', 'h', 'GRACE'):
+                data2 = data2 * 1e3
+                c_mean2 = c_mean2 * 1e3
+            
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
         T = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
              'Oct', 'Nov', 'Dec', ]
-        plt.plot(T, c_mean, color='tab:blue', linewidth=2, zorder=5)
-        plt.plot(T, data, color='tab:orange', linewidth=0.5)
+        if display_mean:
+            plt.plot(T, c_mean, color='tab:blue', linewidth=2, zorder=5)
+            plt.plot(T, data, color='tab:orange', linewidth=0.5)
+            plt.legend(['mean clock', 'clocks'])#bbox_to_anchor=(1., 1.))
+        else:
+            if two:
+                lines_O = plt.plot(T, np.transpose(data2.T-c_mean2),
+                                   color='tab:blue', linewidth=0.5)
+                lines_AOHIS = plt.plot(T, np.transpose(data.T-c_mean),
+                                       color='tab:orange', linewidth=0.5)
+                plt.legend([lines_O[0], lines_AOHIS[0]],
+                           ['Ocean only', 'AOHIS'])
+            else:
+                plt.plot(T, np.transpose(data.T-c_mean), color='tab:orange',
+                         linewidth=0.5)
+                plt.legend(['clocks - mean clock'])
+            
+        if vmin:
+            plt.ylim([vmin, vmax])
         plt.ylabel(unit_dict[unitTo])
         plt.xticks(rotation=90)
         plt.title(self.region)
         plt.grid()
-        plt.legend(['mean clock', 'clocks'])#bbox_to_anchor=(1., 1.))
         plt.tight_layout()
         
         path = (cfg.PATHS['fig_path'] + 'timeseries/mean_clock.pdf')
@@ -3576,7 +3633,7 @@ class Network():
         y = grid.lats()
         datamax = np.max(abs(grid.data))
         print(datamax)
-        # datamax = 4  # WATCH OUT
+        datamax = 8  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -3644,7 +3701,7 @@ class Network():
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
         print(datamax)
-        # datamax = 4  # WATCH OUT
+        datamax = 5  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem

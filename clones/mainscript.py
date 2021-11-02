@@ -31,7 +31,7 @@ import colorednoise as cn
 cfg.configure()
 
 # Clock initialisation --------------------------------------------------------
-CLONETS = Network('psmsl_only', region='asia_pacific')
+CLONETS = Network('psmsl_only', region='')
 print(CLONETS)
 
 # Plot network with pyGMT -----------------------------------------------------
@@ -58,9 +58,9 @@ print(CLONETS)
 # t_ref = '2007_01'
 
 # Daily datetime timeseries ---------------------------------------------------
-t0 = datetime.date(2007, 1, 1)
+t0 = datetime.date(2006, 1, 1)
 T = [t0 + datetime.timedelta(d) for d in range(0, 365)]
-t_ref = '2007'
+t_ref = '2006'
 
 # Monthly string timeseries ---------------------------------------------------
 t_ref = '2006'
@@ -105,20 +105,21 @@ unitTo = 'N'
 #                                save=False, t_ref=t_ref)
 
 # # Plot Root Mean Square -------------------------------------------------------
-fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=False)
+fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=True)
 fig.show()
 
-fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=True,
-                                    world=False, save=False)
-fig.show()
-fig, data, c_mean = CLONETS.plotTimeseriesAndMean(T, 'O', 'pot', 'N',
-                                                  save=False)
+# fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=False,
+#                                     world=True, save=True)
+# fig.show()
+
+# fig, data, c_mean = CLONETS.plotTimeseriesAndMean(T, 'AOHIS', 'pot', 'N',
+                                                  # save=True)
 
 # c_mean, c_mean_loc = CLONETS.mean_clock(T, 'O', 'pot', 'N')
 
 # # Plot Root Mean Square for public --------------------------------------------
-# fig, data = CLONETS.plotRMS2(T, 'H', 'ewh', 'ewh', save=True, trend=31)
-# fig.show()
+# fig, data = CLONETS.plotRMS2(T, 'O', 'pot', 'ewh', save=True)
+# fig.show()      
 
 
 # # Plot Earth System Component -------------------------------------------------
