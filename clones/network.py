@@ -2358,10 +2358,10 @@ class Network():
         """
         
         esc_dict = {'I': 'oggm_',
-                    # 'H': 'clm_tws_',
-                    'H': 'H_',
-                    # 'A': 'coeffs_',
-                    'A': 'A_',
+                    'H': 'clm_tws_',
+                    # 'H': 'H_',
+                    'A': 'coeffs_',
+                    # 'A': 'A_',
                     'O': 'O_',
                     'AOHIS': 'AOHIS_'}
         cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
@@ -2513,6 +2513,8 @@ class Network():
             if lmax:
                 savename = savename[:-4] + 'lmax' + str(lmax) + '.pdf'
             fig.savefig(savename)
+            savename_data = savename[:-4] + '.nc'
+            grid.to_netcdf(savename_data)
         
         return fig, grid
     
