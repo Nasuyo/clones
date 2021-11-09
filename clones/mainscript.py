@@ -105,12 +105,12 @@ unitTo = 'N'
 #                                save=False, t_ref=t_ref)
 
 # # Plot Root Mean Square -------------------------------------------------------
-fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=False)
-fig.show()
-
-# fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=False,
-#                                     world=True, save=True)
+# fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=False)
 # fig.show()
+
+fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=False,
+                                    world=False, save=True)
+fig.show()
 
 # fig, data, c_mean = CLONETS.plotTimeseriesAndMean(T, 'AOHIS', 'pot', 'N',
                                                   # save=True)

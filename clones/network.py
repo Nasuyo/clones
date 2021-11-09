@@ -2498,6 +2498,8 @@ class Network():
             savepath = path + '../../fig/'
             savename = (os.path.join(savepath, esc, esc_dict[esc] + T[0] + '-'
                                      + T[-1] + '_' + unitTo + '_RMS.pdf'))
+            if world == False:
+                savename = savename[:-4] + '_eu.pdf'
             if trend == 'linear':
                 savename = savename[:-4] + '_detrended.pdf'
             if trend == 'annual':
@@ -2927,6 +2929,7 @@ class Network():
                 savename = savename[:-4] + '_detrended.pdf'
             print(savename)
             fig.savefig(savename)
+            df.to_pickle(savename[:-4]+'.pkl')
         
         return fig, EUROPA_rms
     

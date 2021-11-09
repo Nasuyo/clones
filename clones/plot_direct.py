@@ -8,6 +8,7 @@ Created on Thu Nov  4 14:43:39 2021
 
 import numpy as np
 import xarray as xr
+import pandas as pd
 import pyshtools as sh
 import pygmt
 import geojson
@@ -76,7 +77,26 @@ def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     
     return fig
 
+def plot_world_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms,
+                         datamax=False):
     
+    fig = pygmt.Figure()
+    with pygmt.clib.Session() as session:
+        session.call_module('gmtset', 'FONT 15p')
+    if not datamax:
+        datamax = np.max(abs(data))
+    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, datamax])
+    fig.coast(projection="R15c", region="d", frame=["a", "WSne"],
+              shorelines="1/0.1p,black", borders="1/0.1p,black",
+              land='grey')
+    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/datamax,
+             cmap='viridis')
+    with pygmt.clib.Session() as session:
+        session.call_module('gmtset', 'FONT 18p')
+    fig.colorbar(position='JMR+w10c/0.6c', frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+
+    return fig
+
 def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     """Helper function for plotting on Europe map.
     
@@ -144,6 +164,51 @@ def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     
     return fig
 
+    
+def plot_eu_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms=False,
+                      datamax=False):
+    """Helper function for plotting on Europe map.
+    
+    Parameters
+    ----------
+    data: np.array
+        clock data
+    lats, lons: np.array
+        latitudes and longitudes of the data points
+    esc: str
+        earth system component (Ice, Atmosphere, Hydrology, Ocean)
+    unitTo: str
+        unit of the plotted signal
+    cb_dict: dictionary
+        colorbar label dictionary
+    rms: bool, optional
+        leads to a different colormap
+        
+    Returns
+    -------
+    fig: pygmt.Figure
+        the plotted figure object
+    """
+    
+    fig = pygmt.Figure()
+    with pygmt.clib.Session() as session:
+        session.call_module('gmtset', 'FONT 20p')
+    if not datamax:
+        datamax = np.max(abs(data))
+    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, datamax])
+    region = [-30, 30, 20, 70]
+    fig.coast(region=region, projection="S0/90/6i",
+              frame=["ag", "WSne"], shorelines="1/0.1p,black",
+              borders="1/0.1p,black", land='grey')
+    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/datamax,
+             cmap='viridis')
+    with pygmt.clib.Session() as session:
+        session.call_module('gmtset', 'FONT 24p')     
+    cbar_pos = 'g' + str(region[1]-2) + '/' + str(region[2]-10) + '+w13c/0.5c'
+    fig.colorbar(position=cbar_pos, frame='paf+l' + cb_dict[unitTo])  # @+x@+ for ^x
+
+    return fig
+
 # Options ---------------------------------------------------------------------
 esc = 'AOHIS'
 path = '../../data/'
@@ -162,6 +227,13 @@ datamax = 5
 # Load grid -------------------------------------------------------------------
 filename = path + '../fig/AOHIS/AOHIS_2006_01-2006_12_N_RMS.nc'
 grid = sh.SHGrid.from_netcdf(filename)
-
+# Load clockwise data ---------------------------------------------------------
+filename = path + '../fig/AOHIS/AOHIS_2006_01-2006_12_N_clockwise_RMS.pkl'
+data = pd.read_pickle(filename)
+clock_data = np.array(data.data)
+lats = np.array(data.lat)
+lons = np.array(data.lon)
 # Function calls --------------------------------------------------------------
-fig = plot_eu(grid, path, esc, unitTo, cb_dict, rms, datamax)
+fig = plot_eu(grid, path, esc, unitTo, cb_dict, rms, datamax=False)
+fig = plot_world_clockwise(clock_data, lats, lons, esc, unitTo, cb_dict, rms,
+                           datamax=False)
