@@ -12,9 +12,15 @@ import pandas as pd
 import pyshtools as sh
 import pygmt
 import geojson
+import pyshtools as sh
+import scipy
+
+GM = sh.constant.gm_wgs84.value  # gravitational constant times mass [m^2/s^2]
+R = sh.constant.r3_wgs84.value  # mean radius of the Earth [m]
+c = scipy.constants.c  # speed of light [m/s]
 
 
-def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
+def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, vmax=False):
     """Helper function for plotting on world map.
     
     Parameters
@@ -51,9 +57,9 @@ def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     x_stations = [f.geometry.coordinates[0] for f in features]  # lons
     y_stations = [f.geometry.coordinates[1] for f in features]  # lats
     
-    if not datamax:
-        datamax = np.max(abs(grid.data))
-        print(datamax)
+    if not vmax:
+        vmax = np.max(abs(grid.data))
+        print(vmax)
     
     da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
     # save the dataarray as netcdf to work around the 360° plotting problem
@@ -62,9 +68,9 @@ def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
         session.call_module('gmtset', 'FONT 15p')
     fig = pygmt.Figure()
     if rms:
-        pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
+        pygmt.makecpt(cmap='viridis', series=[0, vmax], reverse=True)
     else:
-        pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
+        pygmt.makecpt(cmap='roma', series=[-vmax, vmax])
     fig.grdimage(path + 'temp/pygmt.nc', projection="R15c", region="d", 
                  frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
     fig.coast(shorelines="1/0.1p,black", projection="R15c", region="d", 
@@ -78,18 +84,18 @@ def plot_world(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     return fig
 
 def plot_world_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms,
-                         datamax=False):
+                         vmax=False):
     
     fig = pygmt.Figure()
     with pygmt.clib.Session() as session:
         session.call_module('gmtset', 'FONT 15p')
-    if not datamax:
-        datamax = np.max(abs(data))
-    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, datamax])
+    if not vmax:
+        vmax = np.max(abs(data))
+    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, vmax])
     fig.coast(projection="R15c", region="d", frame=["a", "WSne"],
               shorelines="1/0.1p,black", borders="1/0.1p,black",
               land='grey')
-    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/datamax,
+    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/vmax,
              cmap='viridis')
     with pygmt.clib.Session() as session:
         session.call_module('gmtset', 'FONT 18p')
@@ -97,7 +103,7 @@ def plot_world_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms,
 
     return fig
 
-def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
+def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, vmax=False):
     """Helper function for plotting on Europe map.
     
     Parameters
@@ -133,11 +139,11 @@ def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
     y_stations = [f.geometry.coordinates[1] for f in features]  # lats
     
     # find out what the datalimits are within the shown region: (#TODO: HARDCODED to region)
-    if not datamax:
+    if not vmax:
         data_lim = np.concatenate((grid.to_array()[200:402, -81:],
                                    grid.to_array()[200:402, :242]), axis=1)
-        datamax = np.max(abs(data_lim))
-        print(datamax)
+        vmax = np.max(abs(data_lim))
+        print(vmax)
     
     da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
     # save the dataarray as netcdf to work around the 360° plotting problem
@@ -146,9 +152,9 @@ def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
         session.call_module('gmtset', 'FONT 20p')
     fig = pygmt.Figure()
     if rms:
-        pygmt.makecpt(cmap='viridis', series=[0, datamax], reverse=True)
+        pygmt.makecpt(cmap='viridis', series=[0, vmax], reverse=True)
     else:
-        pygmt.makecpt(cmap='roma', series=[-datamax, datamax])
+        pygmt.makecpt(cmap='roma', series=[-vmax, vmax])
     region = [-30, 30, 20, 70]
     fig.grdimage(path + 'temp/pygmt.nc', region=region,
                  projection="S0/90/6i", frame=["ag", "WSne"])  # frame: a for the standard frame, g for the grid lines
@@ -166,7 +172,7 @@ def plot_eu(grid, path, esc, unitTo, cb_dict, rms=False, datamax=False):
 
     
 def plot_eu_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms=False,
-                      datamax=False):
+                      vmax=False):
     """Helper function for plotting on Europe map.
     
     Parameters
@@ -193,14 +199,14 @@ def plot_eu_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms=False,
     fig = pygmt.Figure()
     with pygmt.clib.Session() as session:
         session.call_module('gmtset', 'FONT 20p')
-    if not datamax:
-        datamax = np.max(abs(data))
-    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, datamax])
+    if not vmax:
+        vmax = np.max(abs(data))
+    pygmt.makecpt(cmap='viridis', reverse=True, series=[0, vmax])
     region = [-30, 30, 20, 70]
     fig.coast(region=region, projection="S0/90/6i",
               frame=["ag", "WSne"], shorelines="1/0.1p,black",
               borders="1/0.1p,black", land='grey')
-    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/datamax,
+    fig.plot(x=lons, y=lats, style='c0.1i', color=1-data/vmax,
              cmap='viridis')
     with pygmt.clib.Session() as session:
         session.call_module('gmtset', 'FONT 24p')     
@@ -210,30 +216,45 @@ def plot_eu_clockwise(data, lats, lons, esc, unitTo, cb_dict, rms=False,
     return fig
 
 # Options ---------------------------------------------------------------------
-esc = 'AOHIS'
+T = '1995_01-2006_12'
+esc = 'O'
+unitTo = 'h'
+region = 'na_atlantic'  # 'eu' or 'world'
+vmax = 2
 path = '../../data/'
-unitTo = 'N'
+rms = True
 cb_dict = {'U': '"RMS of gravitational potential [m@+2@+/s@+2@+]"',
            'N': '"RMS of Geoid height [mm]"',
-           'h': '"RMS of Elevation [mm]"',
+           'h': '"RMS of geometric height [mm]"',
            'sd': '"RMS of Surface Density [kg/m@+2@+]"',
-           'ewh': '"Mass variability in EWH [m]"',
+           'ewh': '"RMS in Equivalent Water Height [m]"',
            'gravity': '"RMS of gravitational acceleration [m/s@+2@+]"',
-           'ff': '"RMS of Fractional frequency [-]"',
+           'ff': '"RMS of physical height [mm]"',
            'GRACE': '"RMS of Geoid height [mm]"'}
-rms = True
-datamax = 5
 
-# Load grid -------------------------------------------------------------------
-filename = path + '../fig/AOHIS/AOHIS_2006_01-2006_12_N_RMS.nc'
-grid = sh.SHGrid.from_netcdf(filename)
-# Load clockwise data ---------------------------------------------------------
-filename = path + '../fig/AOHIS/AOHIS_2006_01-2006_12_N_clockwise_RMS.pkl'
+# Plot grid -------------------------------------------------------------------
+# filename = path + '../fig/' + esc + '/' + esc + '_' + T + '_' + unitTo + '_RMS.nc'
+# grid = sh.SHGrid.from_netcdf(filename)
+# if unitTo == 'ff':
+#     grid = grid * 1e3 / GM * R**2 * c**2 
+# if region == 'world':
+#     fig = plot_world(grid, path, esc, unitTo, cb_dict, rms, vmax=vmax)
+#     fig.savefig(filename[:-3] + '_world.pdf')
+# else:
+#     fig = plot_eu(grid, path, esc, unitTo, cb_dict, rms, vmax=vmax)
+#     fig.savefig(filename[:-3] + '_eu.pdf')
+    
+# Plot clockwise --------------------------------------------------------------
+filename = path + '../fig/' + esc + '/' + esc + '_' + T + '_' + unitTo + '_clockwise_RMS_meanclock.pkl'
 data = pd.read_pickle(filename)
 clock_data = np.array(data.data)
+if unitTo == 'ff':
+    clock_data = clock_data * 1e3 / GM * R**2 * c**2 
 lats = np.array(data.lat)
 lons = np.array(data.lon)
-# Function calls --------------------------------------------------------------
-fig = plot_eu(grid, path, esc, unitTo, cb_dict, rms, datamax=False)
-fig = plot_world_clockwise(clock_data, lats, lons, esc, unitTo, cb_dict, rms,
-                           datamax=False)
+if region == 'world':
+    fig2 = plot_world_clockwise(clock_data, lats, lons, esc, unitTo, cb_dict, rms, vmax=vmax)
+    fig2.savefig(filename[:-4] + '_world.pdf')
+else:
+    fig2 = plot_eu_clockwise(clock_data, lats, lons, esc, unitTo, cb_dict, rms, vmax=vmax)
+    fig2.savefig(filename[:-4] + '_eu.pdf')

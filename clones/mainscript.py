@@ -31,7 +31,7 @@ import colorednoise as cn
 cfg.configure()
 
 # Clock initialisation --------------------------------------------------------
-CLONETS = Network('psmsl_only', region='')
+CLONETS = Network('psmsl_only', region='eu_atlantic')
 print(CLONETS)
 
 # Plot network with pyGMT -----------------------------------------------------
@@ -64,8 +64,13 @@ t_ref = '2006'
 
 # Monthly string timeseries ---------------------------------------------------
 t_ref = '2006'
-T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
-
+T = [t_ref + '_' + f'{m:02}' for m in range(1, 13)]
+# AOHIS 12 year monthly time string timeseries --------------------------------
+T = []
+for y in range(1995, 2007):
+    for d in range(1, 13):
+        T.append(str(y) + '_' + f'{d:02}')
+        
 # # Monthly string timeseries 3 years -------------------------------------------
 # months = ['%02d' % (i) for i in range(1, 13)] * 3
 # months.insert(0, months.pop())
@@ -76,7 +81,7 @@ T = [t_ref + '_' + f'{d:02}' for d in range(1, 13)]
 
 # Plot clock timeseries -------------------------------------------------------
 sigma = [1e-18, 1e-19, 1e-20]
-unitTo = 'N'
+unitTo = 'ff'
 # bern.plotTimeseries(T, 'H', 'ewh', unitTo, sigma=False, save=False, t_ref=t_ref)
 # bern.plotTimeFrequencies(T, 'H', 'ewh', unitTo, 86400, fmax=20, 
 #                           sigma=False, save=False, t_ref=t_ref)
@@ -99,23 +104,27 @@ unitTo = 'N'
 # dunkerque_virginiakey = CLONETS.search_link('locations', ('DUNKERQUE', 'VIRGINIA KEY, FL'))[0]
 # dunkerque_barcelona = CLONETS.search_link('locations', ('DUNKERQUE', 'BARCELONA'))[0]
 
-# braun_bern.plotTimeseries(T, 'O', 'pot', unitTo, sigma=False, vmin=-2.2,
-#                           vmax=2.2, save=False, t_ref=t_ref)
+# braun_virginiakey.plotTimeseries(T, 'A', 'pot', unitTo, sigma=False, save=False, t_ref=t_ref)
 # braun_bern.plotTimeFrequencies(T, 'A', 'pot', unitTo, 86400, sigma=False,
-#                                save=False, t_ref=t_ref)
+#                                 save=False, t_ref=t_ref)
 
 # # Plot Root Mean Square -------------------------------------------------------
-# fig, data = CLONETS.plotRMS(T, 'AOHIS', 'pot', 'N', save=True, world=False)
+# world = False
+# unitTo = 'ff'
+# esc = 'O'
+# fig, data = CLONETS.plotRMS(T, esc, 'pot', unitTo, trend='linear', save=True,
+#                             world=world)
 # fig.show()
 
-fig, data = CLONETS.plotRMSatClocks(T, 'AOHIS', 'pot', 'N', mean_clock=False,
-                                    world=False, save=True)
-fig.show()
+# fig, data = CLONETS.plotRMSatClocks(T, esc, 'pot', unitTo, trend=None,
+#                                     mean_clock=True,
+#                                     world=world, save=True)
+# fig.show()
 
 # fig, data, c_mean = CLONETS.plotTimeseriesAndMean(T, 'AOHIS', 'pot', 'N',
                                                   # save=True)
 
-# c_mean, c_mean_loc = CLONETS.mean_clock(T, 'O', 'pot', 'N')
+c_mean, c_mean_loc = CLONETS.mean_clock(T, 'O', 'pot', 'N')
 
 # # Plot Root Mean Square for public --------------------------------------------
 # fig, data = CLONETS.plotRMS2(T, 'O', 'pot', 'ewh', save=True)

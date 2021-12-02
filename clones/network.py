@@ -241,8 +241,8 @@ class Clock():
         
         esc_dict = {'I': 'oggm_',
                     'I_scandinavia': 'oggm_',
-                    'H': 'clm_tws_',
-                    'A': 'coeffs_',
+                    'H': 'H_', #'clm_tws_',
+                    'A': 'A_', #'coeffs_',
                     'O': 'O_',
                     'AOHIS': 'AOHIS_',
                     'GRACE_ITSG2018': 'ITSG_Grace2018_n120_'}
@@ -450,8 +450,6 @@ class Clock():
         
         return T_date, series, series_upper, series_lower
      
-    # def plotTimeseries(self, T, esc, unitFrom, unitTo, t_ref=False,
-    #                    reset=False, error=False, sigma=False, save=False):
     def plotTimeseries(self, T, esc, unitFrom, unitTo, sigma=False, save=False,
                        **kwargs):
         """Plots time series at clock location.
@@ -2850,7 +2848,7 @@ class Network():
             print(t)
         EUROPA = np.array(EUROPA)  # 365er-liste mit ~20er arrays
         
-        if mean_clock:  #TODO: only works without trend right now.
+        if mean_clock:  #TODO: only works without trend right now. Trend should be irrelevant anyway though, relative to a mean clock.
             c_mean = np.array([np.mean(x) for x in EUROPA])
             
         EUROPA_rms = np.zeros((np.shape(EUROPA)[1]))
@@ -2927,6 +2925,8 @@ class Network():
                                      + '_clockwise_RMS.pdf'))
             if trend == 'linear':
                 savename = savename[:-4] + '_detrended.pdf'
+            if mean_clock:
+                savename = savename[:-4] + '_meanclock.pdf'
             print(savename)
             fig.savefig(savename)
             df.to_pickle(savename[:-4]+'.pkl')
@@ -3148,8 +3148,8 @@ class Network():
             
         plt.rcParams.update({'font.size': 13})  # set before making the figure!        
         fig, ax = plt.subplots()
-        T = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
-             'Oct', 'Nov', 'Dec', ]
+        # T = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 
+        #      'Oct', 'Nov', 'Dec', ]
         if display_mean:
             plt.plot(T, c_mean, color='tab:blue', linewidth=2, zorder=5)
             plt.plot(T, data, color='tab:orange', linewidth=0.5)
@@ -3437,7 +3437,7 @@ class Network():
                             save=False):
         """Plots a time series including GRACE and clock error ranges.
         
-        Used for the Schröder et al. (2021) Fig. 15.
+        Used for the Schröder et al. (2021) Fig. 14.
         
         Parameters
         ----------
@@ -3638,7 +3638,7 @@ class Network():
         y = grid.lats()
         datamax = np.max(abs(grid.data))
         print(datamax)
-        datamax = 8  # WATCH OUT
+        # datamax = 8  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
@@ -3706,7 +3706,7 @@ class Network():
                                 grid.to_array()[200:402, :242]), axis=1)
         datamax = np.max(abs(data_lim))
         print(datamax)
-        datamax = 5  # WATCH OUT
+        # datamax = 5  # WATCH OUT
         
         da = xr.DataArray(grid.data, coords=[y, x], dims=['lat', 'lon'])
         # save the dataarray as netcdf to work around the 360° plotting problem
